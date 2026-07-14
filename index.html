@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta id="viewport-meta" name="viewport" content="width=1400, initial-scale=1.0">
+<script>
+(function(){
+  // подразумевано се приказује верзија за рачунар; ако је корисник претходно
+  // изабрао мобилну верзију, поштујемо тај избор
+  try{
+    var mode = localStorage.getItem('fkBarandaViewMode');
+    if(mode === 'mobile'){
+      document.getElementById('viewport-meta').setAttribute('content','width=device-width, initial-scale=1.0');
+    }
+  }catch(e){}
+})();
+</script>
+<title>ФК Баранда — статистика</title>
+<style>
+:root{
+  --purple:#37003c; --purple2:#5a1a63; --pink:#e90052; --cyan:#04b8d6;
+  --bg:#f2eef4; --panel:#ffffff; --panel2:#faf6fb; --border:#e2d9e6;
+  --text:#20051f; --text-dim:#6b5870; --text-faint:#9d8fa1;
+  --accent:#00a15c; --accent2:#017a46; --blue:#0091c2; --gold:#eaa300;
+  --green:#00a15c; --amber:#e08a00; --red:#d81159;
+  --radius:12px;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;}
+.app{display:flex;flex-direction:column;min-height:100vh;}
+
+/* Top nav (styled after premierleague.com/en/stats tab bar) */
+.sidebar{width:auto;flex-shrink:0;background:linear-gradient(135deg,var(--purple),var(--purple2));
+  border-right:none;border-bottom:4px solid var(--pink);
+  padding:0.7rem 1.4rem;position:sticky;top:0;height:auto;overflow-y:visible;z-index:40;
+  display:flex;align-items:center;gap:1.6rem;flex-wrap:wrap;box-shadow:0 4px 18px rgba(55,0,60,0.25);}
+.brand{display:flex;align-items:center;gap:0.6rem;padding:0;border-bottom:none;margin-bottom:0;flex-shrink:0;}
+.brand-badge{width:38px;height:38px;border-radius:50%;background:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;color:var(--purple);flex-shrink:0;}
+.brand-name{font-weight:800;font-size:0.95rem;line-height:1.2;color:#fff;letter-spacing:.01em;}
+.brand-sub{font-size:0.65rem;color:#e8c7ee;text-transform:uppercase;letter-spacing:.06em;}
+.nav-item{display:flex;align-items:center;gap:0.45rem;padding:0.5rem 0.9rem;border-radius:999px;cursor:pointer;
+  color:#e8d3ec;font-size:0.82rem;font-weight:700;margin-bottom:0;user-select:none;white-space:nowrap;
+  border:1px solid transparent;transition:background .15s ease,color .15s ease;}
+.nav-item:hover{background:rgba(255,255,255,0.1);color:#fff;}
+.nav-item.active{background:#fff;color:var(--purple);}
+.nav-emoji{font-size:0.95rem;width:auto;text-align:center;}
+
+.mobile-toggle{display:none;}
+
+/* Main */
+.main{flex:1;min-width:0;padding:1.8rem 2rem 3rem 2rem;max-width:1400px;margin:0 auto;width:100%;}
+.page{display:none;}
+.page.active{display:block;animation:fadein .25s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+h1.page-title{margin:0 0 1.2rem 0;font-size:1.9rem;font-weight:800;color:var(--purple);display:flex;align-items:center;gap:0.6rem;
+  border-bottom:3px solid var(--pink);padding-bottom:0.6rem;}
+h2.section-title{font-size:1.02rem;font-weight:800;color:var(--purple);margin:1.8rem 0 0.8rem 0;text-transform:uppercase;letter-spacing:.02em;}
+h2.section-title:first-child{margin-top:0;}
+p.hint{color:var(--text-faint);font-size:0.82rem;margin:-0.4rem 0 1rem 0;}
+
+/* metric cards */
+.metric-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:0.4rem;}
+.metric-card{position:relative;flex:1 1 170px;min-width:150px;background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;padding:1.1rem 1.15rem 1.25rem 1.15rem;overflow:hidden;box-shadow:0 2px 10px rgba(55,0,60,0.06);}
+.metric-icon{width:36px;height:36px;border-radius:9px;border:1px solid;display:flex;align-items:center;justify-content:center;
+  padding:7px;margin-bottom:0.65rem;}
+.metric-icon svg{width:100%;height:100%;}
+.metric-label{font-size:0.66rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);margin-bottom:0.3rem;}
+.metric-value{font-size:1.75rem;font-weight:800;color:var(--purple);line-height:1.1;margin-bottom:0.25rem;}
+.metric-sub{font-size:0.75rem;color:var(--text-faint);}
+.metric-bar{position:absolute;left:0;bottom:0;height:4px;width:60%;border-radius:0 4px 4px 0;}
+
+/* panels */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.2rem;margin-bottom:1.2rem;
+  box-shadow:0 2px 10px rgba(55,0,60,0.05);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+/* controls */
+select, input[type=number], input[type=text]{
+  background:#fff;color:var(--text);border:1px solid #cbbdd0;border-radius:8px;
+  padding:0.45rem 0.6rem;font-size:0.84rem;font-family:inherit;
+}
+select:focus, input:focus{outline:2px solid var(--pink);}
+label.ctrl-label{font-size:0.72rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;
+  display:block;margin-bottom:0.3rem;font-weight:700;}
+.controls-row{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem;}
+.ctrl{display:flex;flex-direction:column;}
+input[type=range]{accent-color:var(--pink);}
+.pill-btn{background:#fff;border:1px solid #cbbdd0;color:var(--text-dim);border-radius:20px;
+  padding:0.35rem 0.85rem;font-size:0.78rem;cursor:pointer;font-weight:700;}
+.pill-btn.active{background:var(--purple);color:#fff;border-color:var(--purple);}
+
+/* table */
+.table-wrap{max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:8px;}
+table.stat-table{width:100%;border-collapse:collapse;font-size:0.82rem;white-space:nowrap;}
+table.stat-table thead th{position:sticky;top:0;background:var(--purple);color:#f1d9f4;font-weight:700;
+  text-transform:uppercase;font-size:0.66rem;letter-spacing:.04em;padding:0.6rem 0.7rem;text-align:center;vertical-align:middle;cursor:pointer;
+  border-bottom:1px solid var(--border);}
+table.stat-table thead th.sorted::after{content:" \25BE";color:var(--pink);}
+.js-player-link,.js-game-link{cursor:pointer;}
+.js-player-link .player-link-name,.js-game-link{transition:color .15s;}
+.js-player-link:hover .player-link-name,.js-game-link:hover{color:var(--pink);text-decoration:underline;}
+a.js-game-link{color:inherit;text-decoration:none;}
+.heatmap-wrap th[data-player]{cursor:pointer;}
+.heatmap-wrap th[data-player]:hover{color:var(--pink);text-decoration:underline;}
+table.stat-table tbody td{padding:0.5rem 0.7rem;text-align:center;vertical-align:middle;border-bottom:1px solid var(--border);color:var(--text);}
+table.stat-table tbody tr:hover{background:var(--panel2);}
+table.stat-table tbody tr.rank-1 td:first-child{color:var(--pink);font-weight:800;}
+.player-cell{display:flex;align-items:center;justify-content:center;gap:0.5rem;}
+
+/* колона "Играч" само у табели на почетној страни: лево поравнање због дужине имена */
+#home-table th:nth-child(2), #home-table td:nth-child(2){text-align:left;}
+#home-table .player-cell{justify-content:flex-start;}
+#game-stats-table th:nth-child(2), #game-stats-table td:nth-child(2){text-align:left;}
+#game-stats-table .player-cell{justify-content:flex-start;}
+#ratings-table th:nth-child(2), #ratings-table td:nth-child(2){text-align:left;}
+#ratings-table .player-cell{justify-content:flex-start;}
+.team-tag{font-size:0.68rem;padding:1px 7px;border-radius:10px;font-weight:700;}
+.team-Black,.team-Bibs{background:#eee5f0;color:#3a1240;}
+.team-White,.team-Colored{background:rgba(233,0,82,0.12);color:var(--pink);}
+
+/* leaderboard bars */
+.bar-row{display:grid;grid-template-columns:110px 1fr 46px;align-items:center;gap:0.6rem;margin:0.45rem 0;font-size:0.82rem;}
+.bar-track{background:var(--panel2);border-radius:6px;height:20px;overflow:hidden;border:1px solid var(--border);}
+.bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--purple),var(--pink));}
+.bar-name{color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+.bar-val{color:var(--purple);font-weight:800;text-align:right;}
+
+/* chips / avatars */
+.player-avatar{width:26px;height:26px;border-radius:50%;background:var(--purple);display:flex;align-items:center;
+  justify-content:center;font-size:0.68rem;font-weight:700;color:#fff;flex-shrink:0;}
+
+/* rating badge */
+.rating-badge{display:inline-flex;align-items:center;justify-content:center;min-width:2.4rem;padding:0.15rem 0.5rem;
+  border-radius:7px;font-weight:800;font-size:0.86rem;}
+.rating-hi{background:rgba(0,161,92,0.14);color:var(--green);}
+.rating-mid{background:rgba(224,138,0,0.14);color:var(--amber);}
+.rating-lo{background:rgba(216,17,89,0.12);color:var(--red);}
+
+/* heatmap */
+.heatmap-wrap{overflow:auto;max-height:640px;}
+table.heatmap{border-collapse:collapse;font-size:0.68rem;}
+table.heatmap th{position:sticky;top:0;background:var(--panel);padding:4px 6px;color:var(--text-dim);font-weight:600;
+  writing-mode:vertical-rl;text-orientation:mixed;max-height:120px;text-align:center;vertical-align:middle;}
+table.heatmap th.rowhead{writing-mode:horizontal-tb;position:sticky;left:0;background:var(--panel);text-align:center;vertical-align:middle;z-index:2;}
+table.heatmap td{width:34px;height:26px;text-align:center;vertical-align:middle;font-weight:700;color:#fff;}
+table.heatmap td.empty{background:transparent;color:var(--text-faint);}
+
+/* podium (awards/ratings top3) */
+.podium{display:flex;align-items:flex-end;gap:0.8rem;justify-content:center;margin:1rem 0 1.6rem 0;}
+.podium-item{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:0.9rem 1.1rem;text-align:center;min-width:140px;
+  box-shadow:0 2px 10px rgba(55,0,60,0.06);}
+.podium-item.first{border-color:var(--gold);border-width:2px;order:2;padding-top:1.4rem;background:#fff9ec;}
+.podium-item.second{order:1;}
+.podium-item.third{order:3;}
+.podium-rank{font-size:1.4rem;margin-bottom:0.2rem;}
+.podium-name{font-weight:700;font-size:0.9rem;margin-bottom:0.2rem;color:var(--purple);}
+.podium-value{font-size:1.5rem;font-weight:800;color:var(--pink);}
+
+/* record cards */
+.record-card{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:0.8rem 1rem;
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;}
+.record-stat{color:var(--text-dim);font-size:0.78rem;text-transform:uppercase;letter-spacing:.03em;font-weight:700;}
+.record-player{font-weight:700;font-size:0.95rem;color:var(--purple);}
+.record-meta{color:var(--text-faint);font-size:0.72rem;}
+.record-value{font-size:1.6rem;font-weight:800;color:var(--pink);}
+
+/* match center — team badges + heading */
+.mc-heading{text-align:center;font-size:1.05rem;font-weight:800;color:var(--purple);text-transform:uppercase;
+  letter-spacing:.06em;margin-bottom:0.7rem;}
+.team-badge{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:1.4rem;flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,0.3);font-family:inherit;}
+.team-badge-Black{background:#161018;color:#fff;border:2px solid #4a3a4f;}
+.team-badge-White{background:#ffffff;color:#20051f;border:2px solid #d8cfdb;}
+.team-badge-Colored{background:linear-gradient(135deg,var(--pink),var(--purple));color:#fff;border:2px solid rgba(255,255,255,0.35);}
+.team-badge-Bibs{background:#8d8892;color:#fff;border:2px solid #6b6570;}
+.match-center-score .mc-team{gap:0.55rem;}
+
+/* match center — goalscorers (PL style) */
+.match-center-score{display:flex;align-items:flex-start;justify-content:center;gap:1.4rem;padding:1.2rem 1rem;
+  margin-bottom:1.2rem;background:linear-gradient(135deg,var(--purple),var(--purple2));border-radius:var(--radius);
+  box-shadow:0 4px 16px rgba(55,0,60,0.18);}
+.match-center-score .mc-team{display:flex;flex-direction:column;align-items:center;gap:0.4rem;flex:1;min-width:0;}
+.match-center-score .mc-team-tag{font-size:0.72rem;padding:3px 12px;border-radius:20px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+.match-center-score .mc-score{font-size:2.2rem;font-weight:800;color:#fff;letter-spacing:.02em;flex-shrink:0;
+  padding:0 0.4rem;margin-top:0.55rem;}
+.mc-team-players{display:flex;flex-direction:column;gap:0.2rem;margin-top:0.35rem;font-size:0.72rem;
+  color:rgba(255,255,255,0.82);font-weight:600;line-height:1.4;text-align:center;}
+.mc-team-players div{white-space:nowrap;}
+@media(max-width:640px){.mc-team-players{font-size:0.64rem;}}
+.match-center-goals{display:grid;grid-template-columns:1fr 1fr;gap:0 1.4rem;}
+.match-center-goals .mc-col{display:flex;flex-direction:column;gap:0.55rem;}
+.match-center-goals .mc-col.mc-right .mc-goal-entry{flex-direction:row-reverse;text-align:right;}
+.mc-goal-entry{display:flex;align-items:flex-start;gap:0.55rem;padding:0.35rem 0;border-bottom:1px dashed var(--border);}
+.mc-goal-entry:last-child{border-bottom:none;}
+.mc-ball{flex-shrink:0;font-size:0.85rem;line-height:1.3;margin-top:0.1rem;}
+.mc-goal-info{display:flex;flex-direction:column;min-width:0;}
+.mc-goal-line{font-size:0.86rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mc-goal-line .mc-minute{color:var(--pink);font-weight:800;}
+.mc-goal-line .mc-og{color:var(--text-faint);font-weight:600;font-style:italic;}
+.mc-assist{font-size:0.74rem;color:var(--text-faint);margin-top:0.1rem;}
+@media(max-width:640px){
+  .match-center-goals{grid-template-columns:1fr;}
+  .match-center-goals .mc-col.mc-right .mc-goal-entry{flex-direction:row;text-align:left;}
+  .match-center-goals .mc-col.mc-right{border-top:1px solid var(--border);padding-top:0.6rem;margin-top:0.2rem;}
+}
+
+/* team stats compare (PL "head to head" style) */
+.team-stats-panel .team-stats-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem;}
+.tsh-team{display:flex;align-items:center;gap:0.55rem;font-weight:800;font-size:0.85rem;color:var(--purple);
+  text-transform:uppercase;letter-spacing:.02em;}
+.tsh-team .team-badge{width:30px;height:30px;font-size:0.9rem;box-shadow:0 2px 6px rgba(0,0,0,0.25);}
+.tsh-team.tsh-right{flex-direction:row-reverse;text-align:right;}
+.team-stat-row{margin:1.05rem 0;}
+.team-stat-values{display:flex;align-items:baseline;justify-content:space-between;gap:0.6rem;margin-bottom:0.4rem;}
+.team-stat-values .tsv{font-size:1.2rem;font-weight:800;color:var(--purple);min-width:2ch;flex-shrink:0;}
+.team-stat-values .tsv.tsv-right{text-align:right;}
+.team-stat-values .team-stat-label{flex:1;text-align:center;font-size:0.72rem;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.03em;font-weight:700;}
+.team-stat-bar{display:flex;height:8px;border-radius:5px;overflow:hidden;background:var(--panel2);border:1px solid var(--border);}
+.team-stat-bar-seg{height:100%;transition:width .2s ease;}
+.team-stat-bar-seg.left{background:linear-gradient(90deg,var(--purple2),var(--purple));}
+.team-stat-bar-seg.right{background:linear-gradient(90deg,var(--pink),#ff5b8c);}
+
+/* sankey */
+.sankey-label{font-size:11px;fill:var(--text-dim);}
+
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-thumb{background:#cbbdd0;border-radius:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+
+@media(max-width:820px){
+  .sidebar{position:sticky;flex-direction:row;overflow-x:auto;height:auto;padding:0.7rem 1rem;gap:0.8rem;}
+  .sidebar.open{left:0;}
+  .main{padding:1.2rem;}
+  .mobile-toggle{display:none;}
+  .grid-2{grid-template-columns:1fr;}
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-badge">ФБ</div>
+      <div>
+        <div class="brand-name">ФК Баранда</div>
+        <div class="brand-sub">статистика сезоне</div>
+      </div>
+    </div>
+    <div class="nav-item active" data-page="page-home"><span class="nav-emoji">🏆</span> Почетна</div>
+    <div class="nav-item" data-page="page-players"><span class="nav-emoji">👤</span> Играчи</div>
+    <div class="nav-item" data-page="page-chemistry"><span class="nav-emoji">🤝</span> Хемија</div>
+    <div class="nav-item" data-page="page-trends"><span class="nav-emoji">📈</span> Трендови</div>
+    <div class="nav-item" data-page="page-awards"><span class="nav-emoji">🥇</span> Награде</div>
+    <div class="nav-item" data-page="page-ratings"><span class="nav-emoji">⭐</span> Оцене</div>
+    <div class="nav-item" data-page="page-history"><span class="nav-emoji">📊</span> Термини</div>
+  </nav>
+
+  <main class="main">
+    <div class="mobile-toggle" id="mobileToggle">☰ Мени</div>
+
+    <!-- ПОЧЕТНА -->
+    <section class="page active" id="page-home">
+      <h1 class="page-title">🏆 ФК Баранда - статистика сезоне 2025/26.</h1>
+      <p class="hint" style="margin-top:-0.5rem;margin-bottom:0.8rem;">од 18. 8. 2025. до 25. 5. 2026.</p>
+      <div class="metric-row" id="home-metrics"></div>
+      <h2 class="section-title">Истакнути појединци</h2>
+      <div class="grid-3" id="home-spotlight" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;"></div>
+      <h2 class="section-title">Табела играча</h2>
+      <div class="controls-row" style="margin-bottom:0.6rem;">
+        <div class="ctrl">
+          <label class="ctrl-label">Мин. одиграних термина (<span id="home-mg-val">1</span>)</label>
+          <input type="range" id="home-mingames" min="1" max="20" value="1">
+        </div>
+      </div>
+      <p class="hint">Играчи испод прага минималних термина се не приказују. Кликни на назив колоне за сортирање.</p>
+      <div id="home-table"></div>
+      <p class="hint" style="margin-top:0.5rem;">Колона „бодови" представља просечан број бодова које играч осваја по термину.</p>
+    </section>
+
+
+    <!-- ИГРАЧИ -->
+    <section class="page" id="page-players">
+      <h1 class="page-title">👤 Профили играча</h1>
+      <div class="controls-row">
+        <div class="ctrl">
+          <label class="ctrl-label">Играч</label>
+          <select id="player-select"></select>
+        </div>
+        <div class="ctrl">
+          <label class="ctrl-label">Мин. термина (<span id="mg-val">1</span>)</label>
+          <input type="range" id="player-mingames" min="1" max="20" value="1">
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h2 class="section-title" style="margin-top:0;">Профил по перцентилима</h2>
+          <div style="height:420px;"><canvas id="radarChart"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2 class="section-title" style="margin-top:0;">Кључне статистике</h2>
+          <div class="grid-2" id="player-keystats" style="grid-template-columns:1fr 1fr;gap:0.6rem;"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="controls-row" style="margin-bottom:0.4rem;">
+          <h2 class="section-title" style="margin:0;">График напретка по терминима</h2>
+          <div class="ctrl" style="margin-left:auto;">
+            <label class="ctrl-label">Статистика</label>
+            <select id="progress-metric"></select>
+          </div>
+        </div>
+        <div style="height:300px;"><canvas id="progressChart"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title" style="margin-top:0;">Учинак по термину</h2>
+        <div id="player-games-table"></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title" style="margin-top:0;">Поређење играча</h2>
+        <div class="controls-row">
+          <div class="ctrl" style="flex:1;min-width:220px;">
+            <label class="ctrl-label">Изабери 2-5 играча (ctrl/cmd + клик)</label>
+            <select id="compare-players" multiple size="6" style="width:100%;"></select>
+          </div>
+          <button class="pill-btn active" id="compare-btn" style="height:2.2rem;">Упореди</button>
+        </div>
+        <div style="height:380px;"><canvas id="compareChart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ХЕМИЈА -->
+    <section class="page" id="page-chemistry">
+      <h1 class="page-title">🤝 Хемија и синергија</h1>
+      <div class="controls-row">
+        <div class="ctrl">
+          <label class="ctrl-label">Мин. заједничких термина (<span id="chem-mg-val">2</span>)</label>
+          <input type="range" id="chem-mingames" min="1" max="10" value="2">
+        </div>
+      </div>
+      <div class="panel">
+        <h2 class="section-title" style="margin-top:0;">Најбољи и најгори парови (исти тим)</h2>
+        <div class="grid-2">
+          <div><h2 class="section-title" style="font-size:0.85rem;color:var(--green);">🔥 Најбоља хемија</h2><div id="chem-best"></div></div>
+          <div><h2 class="section-title" style="font-size:0.85rem;color:var(--red);">❄️ Најслабија хемија</h2><div id="chem-worst"></div></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <h2 class="section-title" style="margin-top:0;">Мрежа хемије — исти тим (% победа заједно)</h2>
+          <div id="same-team-heatmap"></div>
+        </div>
+        <div class="panel">
+          <h2 class="section-title" style="margin-top:0;">Играч против играча (% победа као противници)</h2>
+          <div id="opponent-heatmap"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ТРЕНДОВИ -->
+    <section class="page" id="page-trends">
+      <h1 class="page-title">📈 Трендови сезоне</h1>
+      <div class="panel">
+        <div class="controls-row" style="margin-bottom:0.4rem;">
+          <h2 class="section-title" style="margin:0;">Форма екипе по терминима</h2>
+          <div class="ctrl" style="margin-left:auto;">
+            <label class="ctrl-label">Статистика</label>
+            <select id="trend-metric"></select>
+          </div>
+        </div>
+        <div style="height:300px;"><canvas id="trendChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2 class="section-title" style="margin-top:0;">Голови по месецима</h2>
+        <div style="height:300px;"><canvas id="goalsMonthChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2 class="section-title" style="margin-top:0;">Анализа две осе</h2>
+        <p class="hint">Сви параметри (осим прецизности додавања, која је увек у %) приказани су на 60 минута игре, ради поштеног поређења играча са различитим бројем одиграних минута.</p>
+        <div class="controls-row">
+          <div class="ctrl"><label class="ctrl-label">Водоравна оса</label><select id="quad-x"></select></div>
+          <div class="ctrl"><label class="ctrl-label">Усправна оса</label><select id="quad-y"></select></div>
+          <div class="ctrl"><label class="ctrl-label">Величина тачке</label><select id="quad-size"></select></div>
+          <div class="ctrl" style="margin-left:auto;">
+            <label class="ctrl-label">Мин. одиграних термина (<span id="quad-mg-val">1</span>)</label>
+            <input type="range" id="quad-mingames" min="1" max="20" value="1">
+          </div>
+        </div>
+        <div style="height:540px;"><canvas id="quadChart"></canvas></div>
+        <p class="hint" id="quad-legend-hint" style="margin:0.6rem 0 0 0;"></p>
+      </div>
+    </section>
+
+    <!-- НАГРАДЕ -->
+    <section class="page" id="page-awards">
+      <h1 class="page-title">🥇 Награде сезоне</h1>
+      <div class="panel">
+        <div class="controls-row" style="margin-bottom:0.4rem;">
+          <h2 class="section-title" style="margin:0;">Топ 10 листа</h2>
+          <div class="ctrl">
+            <label class="ctrl-label">Мин. термина (<span id="award-mg-val">1</span>)</label>
+            <input type="range" id="award-mingames" min="1" max="20" value="1">
+          </div>
+          <div class="ctrl" style="margin-left:auto;">
+            <label class="ctrl-label">Статистика</label>
+            <select id="award-metric"></select>
+          </div>
+        </div>
+        <div id="leaderboard-bars"></div>
+      </div>
+      <div class="panel">
+        <h2 class="section-title" style="margin-top:0;">🏆 Рекорди на једном термину</h2>
+        <div id="season-records"></div>
+      </div>
+    </section>
+
+    <!-- ОЦЕНЕ -->
+    <section class="page" id="page-ratings">
+      <h1 class="page-title">⭐ Оцене играча</h1>
+      <p class="hint">Процена оцене (1-10) рачуната искључиво на основу статистике коју водимо — није званична оцена.</p>
+      <h2 class="section-title">Топ 3 — просечна оцена сезоне</h2>
+      <div class="podium" id="rating-podium"></div>
+      <div class="panel">
+        <h2 class="section-title" style="margin-top:0;">Листа свих играча</h2>
+        <div id="ratings-table"></div>
+      </div>
+      <div class="panel">
+        <div class="controls-row" style="margin-bottom:0.4rem;">
+          <h2 class="section-title" style="margin:0;">Оцене по терминима за играча</h2>
+          <div class="ctrl" style="margin-left:auto;">
+            <label class="ctrl-label">Играч</label>
+            <select id="rating-player-select"></select>
+          </div>
+        </div>
+        <div style="height:300px;"><canvas id="ratingTrendChart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ИСТОРИЈА ТЕРМИНА -->
+    <section class="page" id="page-history">
+      <h1 class="page-title">📊 Термини</h1>
+      <div class="controls-row">
+        <div class="ctrl">
+          <label class="ctrl-label">Изабери термин</label>
+          <select id="game-select"></select>
+        </div>
+      </div>
+      <div id="game-score"></div>
+      <div class="panel">
+        <div id="game-goals-list"></div>
+      </div>
+      <div class="panel team-stats-panel">
+        <h2 class="section-title" style="margin-top:0;">Тимска статистика</h2>
+        <div id="game-team-stats"></div>
+      </div>
+      <div class="panel">
+        <h2 class="section-title" style="margin-top:0;">Статистика термина</h2>
+        <div id="game-stats-table"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ================= FK Baranda — statistika engine =================
+const TEAM_LABELS = {Black:"Црни", Colored:"Обојени", White:"Бели", Bibs:"Маркери"};
+const PLAYER_NAME_OVERRIDES = {
+"Drug Tegijev":"Друг Тегијев","Drug Tegijev Marko":"Друг Тегијев Марко","Dusan Bubanjin":"Душан Бубањин",
+"Filip Lazovic":"Филип Лазовић","Ivan Apostolski":"Иван Апостолски","Ivan Filipovic":"Иван Филиповић",
+"Lazar Petrovic":"Лазар Петровић","Luka Ilic":"Лука Илић","Luka Peric":"Лука Перић",
+"Marko Radulovic":"Марко Радуловић","Marko Tegeltija":"Марко Тегелтија","Mihajlo Jovanovic":"Михајло Јовановић",
+"Miljan Jovanovic":"Миљан Јовановић","Nenad":"Ненад","Nepoznat 1":"Непознат 1","Nepoznat 2":"Непознат 2",
+"Nepoznat 3":"Непознат 3","Nikola Nikolic":"Никола Николић","Nikola Prtenjaca":"Никола Пртењача",
+"Ognjen Bubanja":"Огњен Бубања","Ognjen Bubanja (golman)":"Огњен Бубања (голман)","Ognjen Grkinic":"Огњен Гркинић",
+"Slobodan Sobat":"Слободан Шобат","Stefan Lazovic":"Стефан Лазовић","Stevan Lacmanovic":"Стеван Лацмановић",
+"Strahinja Milovanovic":"Страхиња Миловановић","Vanijev Burazer":"Ванијев Буразер","Viktor Joldzic":"Виктор Јолџић",
+"~Viktor 2 (Bubanjin)":"~Виктор 2 (Бубањин)","Right Foot":"Десна нога","Left Foot":"Лева нога","Header":"Глава","Body":"Тело",
+"Bubanja (golman)":"Бубања (голман)","Nenad Tegijev":"Ненад Тегијев","Nenad Vidakovic":"Ненад Видаковић",
+"Dusan Stojicic":"Душан Стојичић","Viktor Vukotic":"Виктор Вукотић","Nenad Rodic":"Ненад Родић"
+};
+const LATIN_DIGRAPHS = {"dž":"џ","lj":"љ","nj":"њ"};
+const LATIN_TO_CYR = {a:"а",b:"б",c:"ц",č:"ч",ć:"ћ",d:"д",đ:"ђ",e:"е",f:"ф",g:"г",h:"х",i:"и",j:"ј",k:"к",l:"л",m:"м",n:"н",o:"о",p:"п",r:"р",s:"с",š:"ш",t:"т",u:"у",v:"в",z:"з",ž:"ж"};
+const CYRILLIC_RE = /[А-Яа-яЂђЈјЉљЊњЋћЏџ]/;
+
+function matchCase(src, repl){
+  if(src === src.toUpperCase() && src !== src.toLowerCase()) return repl.toUpperCase();
+  if(src[0] === src[0].toUpperCase() && src[0] !== src[0].toLowerCase()) return repl.charAt(0).toUpperCase()+repl.slice(1);
+  return repl;
+}
+function latinToCyrillic(text){
+  let out = "", i = 0;
+  while(i < text.length){
+    const two = text.substr(i,2).toLowerCase();
+    if(LATIN_DIGRAPHS[two]){ out += matchCase(text.substr(i,2), LATIN_DIGRAPHS[two]); i+=2; continue; }
+    const ch = text[i]; const repl = LATIN_TO_CYR[ch.toLowerCase()];
+    out += repl ? matchCase(ch, repl) : ch;
+    i++;
+  }
+  return out;
+}
+function transliterate(value){
+  if(value == null) return "";
+  let text = String(value).trim();
+  if(!text) return "";
+  if(PLAYER_NAME_OVERRIDES[text]) return PLAYER_NAME_OVERRIDES[text];
+  if(text.startsWith("OG - ")) return "Аутогол - " + transliterate(text.slice(5));
+  if(CYRILLIC_RE.test(text)) return text;
+  return latinToCyrillic(text);
+}
+function teamLabel(v){ return TEAM_LABELS[String(v).trim()] || String(v).trim(); }
+function normalizeGoalMethod(v){
+  if(v==null) return "Непознато";
+  const t = String(v).trim(); if(!t) return "Непознато";
+  const low = t.toLowerCase();
+  if(low.includes("right")) return "Десна нога";
+  if(low.includes("left")) return "Лева нога";
+  if(low.includes("head")) return "Глава";
+  if(low.includes("body")) return "Тело";
+  if(low.includes("own")) return "Аутогол";
+  return "Непознато";
+}
+function formatDateStr(dateStr){
+  const s = String(dateStr).trim();
+  const m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if(m) return `${parseInt(m[3],10)}. ${parseInt(m[2],10)}. ${m[1]}.`;
+  return s;
+}
+function fmtNum(v, decimals=0){
+  if(v==null || Number.isNaN(v)) return "-";
+  const opts = {minimumFractionDigits:decimals, maximumFractionDigits:decimals};
+  return new Intl.NumberFormat('sr-RS', opts).format(v);
+}
+
+// ---------------- azbučno sortiranje (srpska ćirilica, А-Ш) ----------------
+const SR_CYRILLIC_ALPHABET = "АБВГДЂЕЖЗИЈКЛЉМНЊОПРСТЋУФХЦЧЏШ";
+function srCompare(a,b){
+  const s1 = String(a==null?'':a), s2 = String(b==null?'':b);
+  const len = Math.min(s1.length, s2.length);
+  for(let i=0;i<len;i++){
+    const c1 = s1[i].toUpperCase(), c2 = s2[i].toUpperCase();
+    if(c1===c2) continue;
+    const i1 = SR_CYRILLIC_ALPHABET.indexOf(c1), i2 = SR_CYRILLIC_ALPHABET.indexOf(c2);
+    if(i1===-1 || i2===-1) return c1<c2 ? -1 : (c1>c2 ? 1 : 0);
+    return i1-i2;
+  }
+  return s1.length - s2.length;
+}
+function srSort(arr){ return [...arr].sort(srCompare); }
+function srSortBy(arr, keyFn){ return [...arr].sort((a,b)=>srCompare(keyFn(a),keyFn(b))); }
+
+// ---------------- core config ----------------
+const CORE_STATS = ["Goals","Assists","Big Chances Created","Shots on Goal","Total Shots",
+  "Successful passes","Unsuccessful passes","Successful dribbles","Unsuccessful dribbles",
+  "Tackles Won","Interceptions","Blocks","Saves","Goals Conceded","Corners Taken","Hit Woodwork","Own Goals"];
+const PER60_EXCLUDE = new Set(["Unsuccessful passes","Unsuccessful dribbles"]);
+const RADAR_STATS = ["Goals per 60","Assists per 60","Goal Contributions per 60","Big Chances Created per 60",
+  "Shots on Goal per 60","Successful passes per 60","Successful dribbles per 60","Tackles Won per 60","Interceptions per 60"];
+
+const DISPLAY_LABELS = {
+"Goals":"Голови","Assists":"Асистенције","Goal Contributions":"Голови + асистенције",
+"Big Chances Created":"Створене шансе","Shots on Goal":"Шутеви у оквир","Hit Woodwork":"Погођен оквир гола",
+"Shots off Goal":"Шутеви ван оквира","Blocked Shots":"Блокирани шутеви","Total Shots":"Укупно шутева",
+"Blocks":"Блокаде","Successful passes":"Успешна додавања","Unsuccessful passes":"Неуспешна додавања",
+"Total Passes":"Укупно додавања","Pass Accuracy":"Прецизност паса (%)","Successful dribbles":"Успешни дриблинзи",
+"Unsuccessful dribbles":"Неуспешни дриблинзи","Total Dribbles":"Укупно дриблинга","Dribble Accuracy":"Успешност дриблинга (%)",
+"Tackles Won":"Освојени дуели","Interceptions":"Пресечене лопте","Fouls Against":"Фаулови над играчем",
+"Fouls":"Направљени фаулови","Saves":"Одбране","Goals Conceded":"Примљени голови","Corners Taken":"Изведени корнери",
+"Own Goals":"Аутоголови","Penalties Taken":"Изведени пенали","Penalties scored":"Постигнути пенали",
+"Team Pass Accuracy":"Прецизност додавања",
+"Points":"Бодови","Minutes Played":"Минути","Games Played":"Термини","Points per Game":"Бодови по термину",
+"Player Name":"Играч","Team":"Екипа","Left F. Goals":"Голови левом ногом","Right F. Goals":"Голови десном ногом",
+"Header Goals":"Голови главом","Body Goals":"Голови телом","Events":"Догађаји"
+};
+function displayLabel(col){
+  if(DISPLAY_LABELS[col]) return DISPLAY_LABELS[col];
+  if(col.endsWith(" per 60")){
+    const base = col.slice(0,-7);
+    return displayLabel(base) + " на 60 мин";
+  }
+  return col;
+}
+function safeDiv(n,d){ return (!d || d===0) ? null : n/d; }
+
+// ---------------- build per-player aggregated season stats ----------------
+function buildPlayerStats(rows){
+  const groups = {};
+  rows.forEach(r=>{
+    const p = r["Player Name"];
+    if(!groups[p]) groups[p] = {"Player Name": p, "Games Played":0, "Wins":0, "Draws":0, "Losses":0};
+    const g = groups[p];
+    g["Games Played"]++;
+    const pts = Number(r["Points"]);
+    if(pts===3) g["Wins"]++;
+    else if(pts===1) g["Draws"]++;
+    else if(pts===0) g["Losses"]++;
+    Object.keys(r).forEach(k=>{
+      if(["No.","Date","Team","Player Name"].includes(k)) return;
+      const v = Number(r[k])||0;
+      g[k] = (g[k]||0) + v;
+    });
+  });
+  let players = Object.values(groups);
+  players.forEach(p=>{
+    if(p["Points"]!=null) p["Points per Game"] = round2(safeDiv(p["Points"], p["Games Played"]));
+    if(p["Goals"]!=null && p["Assists"]!=null) p["Goal Contributions"] = (p["Goals"]||0)+(p["Assists"]||0);
+    if(p["Successful passes"]!=null && p["Unsuccessful passes"]!=null){
+      const tot = p["Successful passes"]+p["Unsuccessful passes"];
+      p["Total Passes"] = tot;
+      p["Pass Accuracy"] = round2(safeDiv(p["Successful passes"], tot)*100);
+    }
+    if(p["Successful dribbles"]!=null && p["Unsuccessful dribbles"]!=null){
+      const tot = p["Successful dribbles"]+p["Unsuccessful dribbles"];
+      p["Total Dribbles"] = tot;
+      p["Dribble Accuracy"] = round2(safeDiv(p["Successful dribbles"], tot)*100);
+    }
+    const minutes = p["Minutes Played"];
+    if(minutes){
+      if(p["Goal Contributions"]!=null) p["Goal Contributions per 60"] = round2(safeDiv(p["Goal Contributions"],minutes)*60);
+      if(p["Total Passes"]!=null) p["Total Passes per 60"] = round2(safeDiv(p["Total Passes"],minutes)*60);
+      if(p["Total Dribbles"]!=null) p["Total Dribbles per 60"] = round2(safeDiv(p["Total Dribbles"],minutes)*60);
+      CORE_STATS.forEach(col=>{
+        if(PER60_EXCLUDE.has(col)) return;
+        if(p[col]!=null) p[col+" per 60"] = round2(safeDiv(p[col],minutes)*60);
+      });
+    }
+  });
+  players.sort((a,b)=> (b["Goal Contributions per 60"]||b["Goal Contributions"]||0) - (a["Goal Contributions per 60"]||a["Goal Contributions"]||0));
+  return players;
+}
+function round2(v){ return (v==null || Number.isNaN(v)) ? null : Math.round(v*10)/10; }
+
+function applyPlayerFilters(players, minGames, minMinutes){
+  return players.filter(p => p["Games Played"]>=minGames && (p["Minutes Played"]||0)>=minMinutes);
+}
+
+// ---------------- ratings ----------------
+const RATING_BASELINE=6.0, RATING_MIN=3.0, RATING_MAX=10.0;
+function computeMatchRatings(rows){
+  return rows.map(r=>{
+    const col = (n)=> Number(r[n])||0;
+    let rating = RATING_BASELINE;
+    const isKeeper = col("Saves") > 0;
+    rating += col("Goals")*0.9;
+    rating += col("Assists")*0.6;
+    rating += col("Big Chances Created")*0.25;
+    rating += col("Shots on Goal")*0.06;
+    rating += col("Hit Woodwork")*0.15;
+    rating += col("Corners Taken")*0.03;
+    const sp = col("Successful passes"), up = col("Unsuccessful passes");
+    if(r["Successful passes"]!=null && r["Unsuccessful passes"]!=null){
+      const total = sp+up;
+      const acc = total? (sp/total*100) : 75;
+      const volumeFactor = Math.min(total,20)/20;
+      rating += ((acc-75)/10*0.3)*volumeFactor;
+    }
+    rating += col("Successful dribbles")*0.08;
+    rating -= col("Unsuccessful dribbles")*0.05;
+    rating += col("Tackles Won")*0.12;
+    rating += col("Interceptions")*0.1;
+    rating += col("Blocks")*0.12;
+    if(isKeeper){ rating += col("Saves")*0.25; rating -= col("Goals Conceded")*0.35; }
+    rating -= col("Own Goals")*1.5;
+    const pts = Math.round(col("Points"));
+    const bonus = {3:0.3, 1:0.0, 0:-0.2}[pts]; 
+    if(bonus!=null) rating += bonus;
+    rating = Math.max(RATING_MIN, Math.min(RATING_MAX, rating));
+    rating = Math.round(rating*10)/10;
+    return {player:r["Player Name"], date:r["Date"], team:r["Team"], points:r["Points"], minutes:r["Minutes Played"], rating, isKeeper};
+  });
+}
+function buildPlayerRatings(rows, playerStats){
+  const matchRatings = computeMatchRatings(rows);
+  const byPlayer = {};
+  matchRatings.forEach(m=>{
+    if(!byPlayer[m.player]) byPlayer[m.player] = [];
+    byPlayer[m.player].push(m.rating);
+  });
+  const summary = Object.keys(byPlayer).map(player=>{
+    const arr = byPlayer[player];
+    const avg = arr.reduce((a,b)=>a+b,0)/arr.length;
+    const best = Math.max(...arr), worst = Math.min(...arr);
+    const excellent = arr.filter(v=>v>=7.5).length;
+    const ps = playerStats.find(p=>p["Player Name"]===player) || {};
+    return {player, avg:round2(avg), best, worst, matches:arr.length, excellent,
+      gamesPlayed: ps["Games Played"], minutes: ps["Minutes Played"]};
+  });
+  summary.sort((a,b)=> b.avg - a.avg);
+  return {matchRatings, summary};
+}
+
+// ---------------- chemistry heatmaps ----------------
+function pointsToWin(points){ if(points===3) return 1.0; if(points===1) return 0.5; return 0.0; }
+function combinations(arr){
+  const out = [];
+  for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++) out.push([arr[i],arr[j]]);
+  return out;
+}
+function buildSameTeamHeatmap(rows, minGames){
+  const byGameTeam = {};
+  rows.forEach(r=>{
+    const key = r["Date"]+"|"+r["Team"];
+    if(!byGameTeam[key]) byGameTeam[key] = {players:new Set(), points:r["Points"]};
+    byGameTeam[key].players.add(r["Player Name"]);
+  });
+  const pairStats = {};
+  Object.values(byGameTeam).forEach(({players,points})=>{
+    const winVal = pointsToWin(points);
+    const list = Array.from(players).sort();
+    combinations(list).forEach(([p1,p2])=>{
+      const key = p1+"___"+p2;
+      if(!pairStats[key]) pairStats[key] = {wins:0, games:0};
+      pairStats[key].games++; pairStats[key].wins += winVal;
+    });
+  });
+  return {pairStats, minGames};
+}
+function buildOpponentHeatmap(rows, minGames){
+  const byGame = {};
+  rows.forEach(r=>{
+    if(!byGame[r["Date"]]) byGame[r["Date"]] = {};
+    if(!byGame[r["Date"]][r["Team"]]) byGame[r["Date"]][r["Team"]] = {players:[], points:r["Points"]};
+    byGame[r["Date"]][r["Team"]].players.push(r["Player Name"]);
+  });
+  const pairStats = {};
+  Object.values(byGame).forEach(teams=>{
+    const teamNames = Object.keys(teams);
+    if(teamNames.length !== 2) return;
+    const [t1,t2] = teamNames;
+    const team1 = teams[t1], team2 = teams[t2];
+    team1.players.forEach(p=> team2.players.forEach(o=>{
+      const key = p+"___"+o;
+      if(!pairStats[key]) pairStats[key] = {wins:0, games:0};
+      pairStats[key].games++; pairStats[key].wins += pointsToWin(team1.points);
+    }));
+    team2.players.forEach(p=> team1.players.forEach(o=>{
+      const key = p+"___"+o;
+      if(!pairStats[key]) pairStats[key] = {wins:0, games:0};
+      pairStats[key].games++; pairStats[key].wins += pointsToWin(team2.points);
+    }));
+  });
+  return {pairStats, minGames};
+}
+
+// ---------------- percentile radar ----------------
+function percentileRank(values, target){
+  // pct rank matching pandas rank(pct=True): (rank)/(n)
+  const sorted = [...values].sort((a,b)=>a-b);
+  let countLE = 0;
+  sorted.forEach(v=>{ if(v<=target) countLE++; });
+  return countLE/sorted.length*100;
+}
+function buildRadarData(players, player, minGames, minMinutes){
+  const filtered = applyPlayerFilters(players, minGames, minMinutes);
+  const cols = RADAR_STATS.filter(c=> filtered.some(p=>p[c]!=null));
+  const target = filtered.find(p=>p["Player Name"]===player);
+  if(!target || !cols.length) return null;
+  const values = cols.map(c=>{
+    const vals = filtered.map(p=>p[c]||0);
+    return round2(percentileRank(vals, target[c]||0));
+  });
+  const labels = cols.map(c=> displayLabel(c).replace(" на 60 мин",""));
+  return {labels, values};
+}
+
+// ---------------- single game records ----------------
+const RECORD_STATS = ["Goals","Assists","Big Chances Created","Shots on Goal","Total Shots",
+  "Successful passes","Successful dribbles","Tackles Won","Interceptions","Blocks","Saves","Goals Conceded","Corners Taken"];
+function singleGameRecords(rows){
+  const out = [];
+  RECORD_STATS.forEach(stat=>{
+    let max = -Infinity;
+    rows.forEach(r=>{ const v = Number(r[stat]); if(!Number.isNaN(v) && v>max) max = v; });
+    if(max <= 0 || max === -Infinity) return;
+    const seen = new Set();
+    const matches = rows.filter(r=>Number(r[stat])===max).sort((a,b)=>String(a.Date).localeCompare(String(b.Date)));
+    matches.forEach(r=>{
+      if(seen.has(r["Player Name"])) return;
+      seen.add(r["Player Name"]);
+      out.push({stat: displayLabel(stat), player:r["Player Name"], value:Math.round(max), date:r["Date"], team:r["Team"]});
+    });
+  });
+  return out;
+}
+
+</script>
+<script>
+// ================= App state & init =================
+let TERMINI = [], GOLOVI = [], PLAYER_STATS = [], MATCH_RATINGS = [], RATING_SUMMARY = [];
+let ALL_GAMES = [];
+const charts = {}; // keep refs to destroy on re-render
+
+function initApp(termini, golovi){
+  TERMINI = termini.map(r=>({...r, "Player Name": transliterate(r["Player Name"])}));
+  GOLOVI = golovi.map(r=>({...r, "Goalscorer": transliterate(r["Goalscorer"]), "Goalkeeper": transliterate(r["Goalkeeper"]), "Assist": transliterate(r["Assist"])}));
+  PLAYER_STATS = buildPlayerStats(TERMINI);
+  const rr = buildPlayerRatings(TERMINI, PLAYER_STATS);
+  MATCH_RATINGS = rr.matchRatings;
+  RATING_SUMMARY = rr.summary;
+  ALL_GAMES = Array.from(new Set(TERMINI.map(r=>r.Date))).sort();
+
+  // подразумевани праг за све "мин. термина" скролере: >= 1/4 одиграних термина (заокружено нагоре)
+  const defaultMinGames = Math.max(1, Math.ceil(ALL_GAMES.length/4));
+  ['home-mingames','player-mingames','chem-mingames','award-mingames','quad-mingames'].forEach(id=>{
+    const input = document.getElementById(id);
+    if(!input) return;
+    input.max = Math.max(parseInt(input.max)||1, ALL_GAMES.length, defaultMinGames);
+    input.value = defaultMinGames;
+  });
+
+  setupNav();
+  document.getElementById('home-mingames').addEventListener('input', renderHome);
+  renderHome();
+  renderPlayersPage();
+  renderChemistryPage();
+  renderTrendsPage();
+  renderAwardsPage();
+  renderRatingsPage();
+  renderHistoryPage();
+}
+
+function setupNav(){
+  document.querySelectorAll('.nav-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      item.classList.add('active');
+      document.getElementById(item.dataset.page).classList.add('active');
+      document.getElementById('sidebar').classList.remove('open');
+    });
+  });
+  const toggle = document.getElementById('mobileToggle');
+  if(toggle) toggle.addEventListener('click', ()=> document.getElementById('sidebar').classList.toggle('open'));
+}
+
+// прелазак на страницу по data-page id (исто као клик на ставку у менију)
+function goToPage(pageId){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===pageId));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active', p.id===pageId));
+  document.getElementById('sidebar').classList.remove('open');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// отвара страницу "Играчи" са изабраним играчем
+function goToPlayer(name){
+  if(!name) return;
+  goToPage('page-players');
+  const select = document.getElementById('player-select');
+  if(select){
+    if(![...select.options].some(o=>o.value===name)){
+      // играч не испуњава тренутни праг "мин. термина" - ипак га привремено додај у листу
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      select.appendChild(opt);
+    }
+    select.value = name;
+    select.dispatchEvent(new Event('change'));
+  }
+}
+
+// отвара страницу "Термини" са изабраним термином (по датуму)
+function goToGame(date){
+  if(!date) return;
+  goToPage('page-history');
+  const sel = document.getElementById('game-select');
+  if(sel){
+    sel.value = date;
+    sel.dispatchEvent(new Event('change'));
+  }
+}
+
+// делегирано хватање кликова на линкове ка играчима/терминима, ради без обзира на поновно исцртавање DOM-а
+document.addEventListener('click', (e)=>{
+  const playerLink = e.target.closest('.js-player-link');
+  if(playerLink){ e.preventDefault(); goToPlayer(playerLink.dataset.player); return; }
+  const gameLink = e.target.closest('.js-game-link');
+  if(gameLink){ e.preventDefault(); goToGame(gameLink.dataset.game); return; }
+});
+
+function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+
+function darkChartDefaults(){
+  Chart.defaults.color = '#6b5870';
+  Chart.defaults.borderColor = '#e2d9e6';
+  Chart.defaults.font.family = "-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
+}
+
+// icon svgs reused from python metric cards
+const ICONS = {
+  players:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M15.8 14.2c2.3.3 4 2 4 4.4"/></svg>',
+  games:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="5" width="17" height="15" rx="2.2"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/></svg>',
+  goals:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.5"/><path d="M12 6.8l3.2 2.3-1.2 3.8h-4l-1.2-3.8z"/><path d="M12 6.8V4M8 17.8 5.6 20M16 17.8 18.4 20M4.2 9.3 6.6 9M19.8 9.3 17.4 9"/></svg>',
+  assists:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19.5 17 6.5"/><path d="M12.5 5h5.5v5.5"/><path d="M5.5 14.5 4 19.5l5-1.5"/></svg>',
+  minutes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9.5 2.5h5M12 5V2.5"/></svg>'
+};
+function initials(name){
+  return name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+}
+function ratingClass(v){ if(v>=7.5) return 'rating-hi'; if(v>=6.0) return 'rating-mid'; return 'rating-lo'; }
+
+// generic sortable table builder
+function buildSortableTable(container, columns, rows, opts={}){
+  // columns: [{key, label, format?}]
+  let sortKey = opts.defaultSort || columns[1].key;
+  let sortDir = opts.defaultDir !== undefined ? opts.defaultDir : -1;
+  function render(){
+    const sorted = [...rows].sort((a,b)=>{
+      const av = a[sortKey], bv = b[sortKey];
+      if(typeof av === 'string') return sortDir * srCompare(av, bv);
+      return sortDir * ((av||0) - (bv||0));
+    });
+    let html = '<div class="table-wrap"><table class="stat-table"><thead><tr>';
+    columns.forEach(c=>{
+      html += `<th data-key="${c.key}" class="${c.key===sortKey?'sorted':''}">${c.label}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    sorted.forEach((r,i)=>{
+      html += `<tr class="${i===0?'rank-1':''}">`;
+      columns.forEach(c=>{
+        let v = r[c.key];
+        if(c.key === columns[1].key && columns[1].isPlayer){
+          html += `<td><div class="player-cell js-player-link" data-player="${v}"><div class="player-avatar">${initials(v)}</div><span class="player-link-name">${v}</span></div></td>`;
+        } else {
+          html += `<td>${c.format ? c.format(v,r) : (v==null? '-' : v)}</td>`;
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+    container.querySelectorAll('th').forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const key = th.dataset.key;
+        if(key === sortKey) sortDir *= -1; else { sortKey = key; sortDir = -1; }
+        if(opts.onSortChange) opts.onSortChange(sortKey, sortDir);
+        render();
+      });
+    });
+  }
+  render();
+}
+
+</script>
+<script>
+// ================= ПОЧЕТНА =================
+let homeTableSort = { key: 'Player Name', dir: 1 };
+function renderHome(){
+  const minGames = parseInt(document.getElementById('home-mingames').value)||1;
+  document.getElementById('home-mg-val').textContent = minGames;
+  const eligible = PLAYER_STATS.filter(p=>(p['Games Played']||0) >= minGames);
+
+  const el = document.getElementById('home-metrics');
+  const totalGoals = PLAYER_STATS.reduce((s,p)=>s+(p.Goals||0),0);
+  const totalAssists = PLAYER_STATS.reduce((s,p)=>s+(p.Assists||0),0);
+  const totalMinutes = PLAYER_STATS.reduce((s,p)=>s+(p['Minutes Played']||0),0);
+  const minGamesPct = ALL_GAMES.length ? Math.round((minGames/ALL_GAMES.length)*100) : 0;
+  const cards = [
+    [ICONS.players,'Играчи', eligible.length, `играча је одиграло бар ${minGamesPct}% термина`, '#37003c'],
+    [ICONS.games,'Термини', ALL_GAMES.length, 'одиграна термина', '#37003c'],
+    [ICONS.goals,'Голови', totalGoals, 'постигнути голови', '#37003c'],
+    [ICONS.assists,'Асистенције', totalAssists, 'забележене асистенције', '#0091c2'],
+    [ICONS.minutes,'Минути', totalMinutes.toLocaleString('sr-RS'), 'укупно минута', '#e90052'],
+  ];
+  el.innerHTML = cards.map(([icon,label,val,sub,color])=>`
+    <div class="metric-card">
+      <div class="metric-icon" style="color:${color};border-color:${color}55;background:${color}14">${icon}</div>
+      <div class="metric-label">${label}</div>
+      <div class="metric-value">${val}</div>
+      <div class="metric-sub">${sub}</div>
+      <div class="metric-bar" style="background:linear-gradient(90deg,${color},${color}00)"></div>
+    </div>`).join('');
+
+  // истакнути појединци (само међу играчима који испуњавају праг)
+  const top = (col)=> [...eligible].sort((a,b)=>(b[col]||0)-(a[col]||0))[0];
+  const spotlights = [
+    ['Најбољи стрелац', top('Goals'), 'Goals', 'голова'],
+    ['Најбољи асистент', top('Assists'), 'Assists', 'асистенција'],
+    ['Најбоља прецизност паса', [...eligible].filter(p=>p['Games Played']>=3).sort((a,b)=>(b['Pass Accuracy']||0)-(a['Pass Accuracy']||0))[0], 'Pass Accuracy', '% тачност'],
+    ['Најдуели', top('Tackles Won'), 'Tackles Won', 'освојених дуела'],
+  ];
+  document.getElementById('home-spotlight').innerHTML = spotlights.map(([label,p,col,unit])=> p ? `
+    <div class="panel js-player-link" data-player="${p['Player Name']}" style="text-align:center;">
+      <div class="metric-label">${label}</div>
+      <div class="player-avatar" style="width:44px;height:44px;font-size:1rem;margin:0.6rem auto;">${initials(p['Player Name'])}</div>
+      <div class="player-link-name" style="font-weight:700;">${p['Player Name']}</div>
+      <div style="font-size:1.4rem;font-weight:800;color:var(--green);margin-top:0.2rem;">${fmtNum(p[col],col==='Pass Accuracy'?1:0)}</div>
+      <div class="metric-sub">${unit}</div>
+    </div>` : '<div class="panel" style="text-align:center;"><p class="hint">Нема играча за изабрани праг.</p></div>').join('');
+
+  // табела играча (само они који испуњавају праг)
+  const columns = [
+    {key:'rank', label:'#', format:(v,r,i)=>''},
+    {key:'Player Name', label:'Играч', isPlayer:true},
+    {key:'Games Played', label:'Термини'},
+    {key:'Wins', label:'Победе'},
+    {key:'Losses', label:'Порази'},
+    {key:'Draws', label:'Нерешено'},
+    {key:'Points per Game', label:'Бодови', format:v=>v==null?'-':v.toFixed(1)},
+    {key:'Goals', label:'Голови'},
+    {key:'Assists', label:'Асистенције'},
+    {key:'Goal Contributions', label:'Г+А'},
+    {key:'Pass Accuracy', label:'Пас. %', format:v=>v==null?'-':v.toFixed(1)},
+    {key:'Tackles Won', label:'Дуели'},
+    {key:'Interceptions', label:'Пресеч.'},
+    {key:'Goals Conceded', label:'Прим. голови'},
+    {key:'Minutes Played', label:'Минути'},
+  ];
+  // add rank index
+  const rows = [...eligible].sort((a,b)=>(b['Goal Contributions']||0)-(a['Goal Contributions']||0))
+    .map((p,i)=>({...p, rank:i+1}));
+  buildSortableTable(document.getElementById('home-table'), columns, rows, {
+    defaultSort: homeTableSort.key,
+    defaultDir: homeTableSort.dir,
+    onSortChange: (key, dir) => { homeTableSort.key = key; homeTableSort.dir = dir; }
+  });
+}
+
+// ================= ИГРАЧИ =================
+function renderPlayersPage(){
+  const select = document.getElementById('player-select');
+  const mgSlider = document.getElementById('player-mingames');
+
+  function refreshPlayerOptions(preserveSelection){
+    const minGames = parseInt(mgSlider.value)||1;
+    document.getElementById('mg-val').textContent = minGames;
+    let eligible = srSortBy(PLAYER_STATS.filter(p=>(p['Games Played']||0)>=minGames), p=>p['Player Name']);
+    if(!eligible.length){
+      eligible = [...PLAYER_STATS].sort((a,b)=>(b['Games Played']||0)-(a['Games Played']||0)).slice(0,1);
+    }
+    const prevValue = select.value;
+    select.innerHTML = eligible.map(p=>`<option value="${p['Player Name']}">${p['Player Name']}</option>`).join('');
+    if(preserveSelection && eligible.some(p=>p['Player Name']===prevValue)){
+      select.value = prevValue;
+    } else {
+      select.value = eligible[0]['Player Name'];
+    }
+  }
+
+  refreshPlayerOptions(false);
+  select.addEventListener('change', renderPlayerProfile);
+  mgSlider.addEventListener('input', ()=>{ refreshPlayerOptions(true); renderPlayerProfile(); });
+
+  // comparison tool
+  const playersAZ = srSortBy(PLAYER_STATS, p=>p['Player Name']);
+  const cmpSelect = document.getElementById('compare-players');
+  cmpSelect.innerHTML = playersAZ.map(p=>`<option value="${p['Player Name']}">${p['Player Name']}</option>`).join('');
+  document.getElementById('compare-btn').addEventListener('click', renderComparison);
+
+  renderPlayerProfile();
+}
+
+function renderPlayerProfile(){
+  const player = document.getElementById('player-select').value || PLAYER_STATS[0]['Player Name'];
+  const minGames = parseInt(document.getElementById('player-mingames').value)||1;
+  const minMinutes = 0;
+  document.getElementById('mg-val').textContent = minGames;
+
+  const p = PLAYER_STATS.find(x=>x['Player Name']===player);
+  if(!p) return;
+
+  // radar
+  const radar = buildRadarData(PLAYER_STATS, player, minGames, minMinutes);
+  destroyChart('radarChart');
+  const ctx = document.getElementById('radarChart').getContext('2d');
+  if(radar){
+    charts.radarChart = new Chart(ctx, {
+      type:'radar',
+      data:{ labels: radar.labels, datasets:[{label:player, data: radar.values,
+        backgroundColor:'rgba(233,0,82,0.25)', borderColor:'#37003c', pointBackgroundColor:'#37003c'}]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        scales:{ r:{ min:0, max:100, ticks:{backdropColor:'transparent', color:'#9d8fa1'}, grid:{color:'#e2d9e6'}, angleLines:{color:'#e2d9e6'}, pointLabels:{color:'#37003c', font:{size:11}} } },
+        plugins:{legend:{display:false}}
+      }
+    });
+  }
+
+  // key stats with rank (скалирано на 60 минута, осим прецизности паса)
+  const filtered = applyPlayerFilters(PLAYER_STATS, minGames, minMinutes);
+  const keyStats = ['Goals per 60','Assists per 60','Big Chances Created per 60','Successful passes per 60','Pass Accuracy','Successful dribbles per 60','Tackles Won per 60','Interceptions per 60','Saves per 60','Goals Conceded per 60'];
+  document.getElementById('player-keystats').innerHTML = keyStats.filter(k=>p[k]!=null).map(k=>{
+    const rank = player_stat_rank_js(filtered, player, k);
+    const val = k==='Pass Accuracy' ? (p[k]!=null? p[k].toFixed(1)+'%':'-') : fmtNum(p[k],1);
+    return `<div class="panel" style="padding:0.8rem 1rem;">
+      <div class="metric-label">${displayLabel(k)}</div>
+      <div style="display:flex;align-items:baseline;gap:0.5rem;">
+        <div style="font-size:1.4rem;font-weight:800;">${val}</div>
+        ${rank? `<div class="metric-sub">#${rank} у екипи</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // progress line chart
+  renderProgressChart(player);
+
+  // performance per game table
+  const gameRows = TERMINI.filter(r=>r['Player Name']===player).sort((a,b)=>String(a.Date).localeCompare(String(b.Date)));
+  const cols = [
+    {key:'Date', label:'Термин', format:v=>`<a href="#" class="js-game-link" data-game="${v}">${formatDateStr(v)}</a>`},
+    {key:'Team', label:'Екипа', format:v=>teamLabel(v)},
+    {key:'Goals', label:'Голови'}, {key:'Assists', label:'Асистенције'},
+    {key:'Successful passes', label:'Усп. додавања'}, {key:'Tackles Won', label:'Дуели'},
+    {key:'Interceptions', label:'Пресеч.'}, {key:'Minutes Played', label:'Минути'},
+  ];
+  buildSortableTable(document.getElementById('player-games-table'), cols, gameRows, {defaultSort:'Date'});
+}
+function player_stat_rank_js(filtered, player, column){
+  const vals = filtered.map(p=>Number(p[column])||0);
+  const target = filtered.find(p=>p['Player Name']===player);
+  if(!target) return null;
+  const tv = Number(target[column])||0;
+  const sorted = [...vals].sort((a,b)=>b-a);
+  let rank = 1;
+  for(const v of sorted){ if(v>tv) rank++; else break; }
+  return rank;
+}
+
+function renderProgressChart(player){
+  const metricSel = document.getElementById('progress-metric');
+  if(!metricSel.options.length){
+    const metrics = ['Goals','Assists','Successful passes','Tackles Won','Interceptions','Minutes Played'];
+    metricSel.innerHTML = metrics.map(m=>`<option value="${m}">${displayLabel(m)}</option>`).join('');
+    metricSel.addEventListener('change', ()=>renderProgressChart(document.getElementById('player-select').value));
+  }
+  const metric = metricSel.value || 'Goals';
+  const rows = TERMINI.filter(r=>r['Player Name']===player).sort((a,b)=>String(a.Date).localeCompare(String(b.Date)));
+  destroyChart('progressChart');
+  const ctx = document.getElementById('progressChart').getContext('2d');
+  charts.progressChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels: rows.map(r=>formatDateStr(r.Date)),
+      datasets:[{ label: displayLabel(metric), data: rows.map(r=>r[metric]||0),
+        borderColor:'#37003c', backgroundColor:'rgba(55,0,60,0.10)', fill:true, tension:0.3, pointRadius:3 }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true} },
+      plugins:{legend:{display:false}} }
+  });
+}
+
+function renderComparison(){
+  const selected = Array.from(document.getElementById('compare-players').selectedOptions).map(o=>o.value).slice(0,5);
+  if(selected.length<2) return;
+  const metrics = ['Goals','Assists','Successful passes','Tackles Won','Interceptions','Saves'];
+  const colors = ['#37003c','#0091c2','#e90052','#f87171','#a78bfa'];
+  destroyChart('compareChart');
+  const ctx = document.getElementById('compareChart').getContext('2d');
+  charts.compareChart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels: metrics.map(displayLabel),
+      datasets: selected.map((name,i)=>{
+        const p = PLAYER_STATS.find(x=>x['Player Name']===name) || {};
+        return { label:name, data: metrics.map(m=>p[m]||0), backgroundColor: colors[i%colors.length] };
+      })},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true} } }
+  });
+}
+
+</script>
+<script>
+// ================= ХЕМИЈА =================
+function renderChemistryPage(){
+  document.getElementById('chem-mingames').addEventListener('input', renderChemistry);
+  renderChemistry();
+}
+function renderChemistry(){
+  const minGames = parseInt(document.getElementById('chem-mingames').value)||2;
+  document.getElementById('chem-mg-val').textContent = minGames;
+
+  const {pairStats: samePairs} = buildSameTeamHeatmap(TERMINI, minGames);
+  const {pairStats: oppPairs} = buildOpponentHeatmap(TERMINI, minGames);
+
+  renderHeatmapTable('same-team-heatmap', samePairs, minGames, true);
+  renderHeatmapTable('opponent-heatmap', oppPairs, minGames, false);
+
+  // best/worst pairs (same team)
+  const entries = Object.entries(samePairs).filter(([k,v])=>v.games>=minGames)
+    .map(([k,v])=>({pair:k.split('___'), winPct: v.wins/v.games*100, games:v.games}));
+  entries.sort((a,b)=>b.winPct-a.winPct);
+  const best = entries.slice(0,5), worst = [...entries].sort((a,b)=>a.winPct-b.winPct).slice(0,5);
+  const renderPairList = (list)=> list.map(e=>`
+    <div class="record-card">
+      <div>
+        <div class="record-player"><span class="js-player-link" data-player="${e.pair[0]}"><span class="player-link-name">${e.pair[0]}</span></span> + <span class="js-player-link" data-player="${e.pair[1]}"><span class="player-link-name">${e.pair[1]}</span></span></div>
+        <div class="record-meta">${e.games} заједничких термина</div>
+      </div>
+      <div class="record-value" style="font-size:1.2rem;">${e.winPct.toFixed(0)}%</div>
+    </div>`).join('') || '<p class="hint">Нема парова са довољно заједничких термина.</p>';
+  document.getElementById('chem-best').innerHTML = renderPairList(best);
+  document.getElementById('chem-worst').innerHTML = renderPairList(worst);
+}
+
+function renderHeatmapTable(containerId, pairStats, minGames, symmetric){
+  const players = new Set();
+  Object.entries(pairStats).forEach(([k,v])=>{
+    if(v.games>=minGames){ const [a,b]=k.split('___'); players.add(a); players.add(b); }
+  });
+  const list = srSort(Array.from(players));
+  const container = document.getElementById(containerId);
+  if(!list.length){ container.innerHTML = '<p class="hint">Недовољно података за изабрани праг термина.</p>'; return; }
+
+  function getVal(a,b){
+    if(a===b) return null;
+    const key = a+"___"+b, key2 = b+"___"+a;
+    if(pairStats[key] && pairStats[key].games>=minGames) return pairStats[key];
+    if(symmetric && pairStats[key2] && pairStats[key2].games>=minGames) return pairStats[key2];
+    return null;
+  }
+  function colorFor(pct){
+    // green scale 0-100
+    const g = Math.round(40 + pct*1.2);
+    const r = Math.round(220 - pct*1.6);
+    return `rgb(${Math.max(40,r)},${Math.min(200,g)},80)`;
+  }
+  let html = '<div class="heatmap-wrap"><table class="heatmap"><thead><tr><th class="rowhead"></th>';
+  list.forEach(p=> html += `<th title="${p}" class="js-player-link" data-player="${p}">${p.split(' ').map(w=>w[0]).join('')}</th>`);
+  html += '</tr></thead><tbody>';
+  list.forEach(rowP=>{
+    html += `<tr><th class="rowhead js-player-link" data-player="${rowP}">${rowP}</th>`;
+    list.forEach(colP=>{
+      const v = getVal(rowP,colP);
+      if(rowP===colP || !v){ html += '<td class="empty">·</td>'; }
+      else {
+        const pct = v.wins/v.games*100;
+        html += `<td style="background:${colorFor(pct)}" title="${rowP} + ${colP}: ${pct.toFixed(0)}% (${v.games} терм.)">${pct.toFixed(0)}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+// ================= ТРЕНДОВИ =================
+function renderTrendsPage(){
+  const trendSel = document.getElementById('trend-metric');
+  const metrics = ['Goals','Assists','Successful passes','Tackles Won','Team Pass Accuracy'];
+  trendSel.innerHTML = metrics.map(m=>`<option value="${m}">${displayLabel(m)}</option>`).join('');
+  trendSel.addEventListener('change', renderTeamFormChart);
+  renderTeamFormChart();
+  renderGoalsByMonth();
+  setupQuadrant();
+}
+
+function renderTeamFormChart(){
+  const metric = document.getElementById('trend-metric').value || 'Goals';
+  const dates = [...new Set(TERMINI.map(r=>r.Date))].sort();
+  let byGame = {};
+  if(metric === 'Team Pass Accuracy'){
+    // izracunaj ukupnu preciznost dodavanja po terminu (svi igraci zajedno)
+    const succ = {}, unsucc = {};
+    TERMINI.forEach(r=>{
+      succ[r.Date] = (succ[r.Date]||0) + (Number(r['Successful passes'])||0);
+      unsucc[r.Date] = (unsucc[r.Date]||0) + (Number(r['Unsuccessful passes'])||0);
+    });
+    dates.forEach(d=>{
+      const tot = (succ[d]||0) + (unsucc[d]||0);
+      byGame[d] = tot>0 ? Math.round((succ[d]/tot*100)*10)/10 : 0;
+    });
+  } else {
+    // sum per game across all players
+    TERMINI.forEach(r=>{
+      if(!byGame[r.Date]) byGame[r.Date] = 0;
+      byGame[r.Date] += Number(r[metric])||0;
+    });
+  }
+  destroyChart('trendChart');
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  charts.trendChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels: dates.map(formatDateStr),
+      datasets:[{ label: displayLabel(metric), data: dates.map(d=>byGame[d]),
+        borderColor:'#0091c2', backgroundColor:'rgba(91,107,240,0.15)', fill:true, tension:0.3, pointRadius:2 }]},
+    options:{ responsive:true, maintainAspectRatio:false, scales:{x:{grid:{display:false}}, y:{beginAtZero:true, max: metric==='Team Pass Accuracy' ? 100 : undefined}}, plugins:{legend:{display:false}} }
+  });
+}
+
+function renderGoalsByMonth(){
+  const byMonth = {};
+  GOLOVI.forEach(g=>{
+    const s = String(g.Date);
+    const m = s.match(/^(\d{4})(\d{2})/);
+    if(!m) return;
+    const key = `${m[1]}-${m[2]}`;
+    byMonth[key] = (byMonth[key]||0)+1;
+  });
+  const months = Object.keys(byMonth).sort();
+  const monthNames = ['Јан','Феб','Мар','Апр','Мај','Јун','Јул','Авг','Сеп','Окт','Нов','Дец'];
+  destroyChart('goalsMonthChart');
+  const ctx = document.getElementById('goalsMonthChart').getContext('2d');
+  charts.goalsMonthChart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels: months.map(m=>{ const [y,mo]=m.split('-'); return monthNames[parseInt(mo)-1]+' '+y.slice(2);}),
+      datasets:[{ label:'Голови', data: months.map(m=>byMonth[m]), backgroundColor:'#e90052' }]},
+    options:{ responsive:true, maintainAspectRatio:false, scales:{x:{grid:{display:false}}, y:{beginAtZero:true}}, plugins:{legend:{display:false}} }
+  });
+}
+
+// параметри доступни за осе: све "на 60 минута" стопе + проценти (пас/дриблинг тачност)
+const QUAD_PERCENT_STATS = ['Pass Accuracy','Dribble Accuracy'];
+const QUAD_PER60_STATS = [
+  'Goal Contributions per 60','Goals per 60','Assists per 60','Big Chances Created per 60',
+  'Shots on Goal per 60','Total Shots per 60','Successful passes per 60','Total Passes per 60',
+  'Successful dribbles per 60','Total Dribbles per 60','Tackles Won per 60','Interceptions per 60',
+  'Blocks per 60','Saves per 60','Goals Conceded per 60','Corners Taken per 60','Hit Woodwork per 60','Own Goals per 60'
+];
+const QUAD_AXIS_STATS = [...QUAD_PERCENT_STATS, ...QUAD_PER60_STATS];
+const QUAD_SIZE_STATS = [...QUAD_AXIS_STATS, 'Minutes Played', 'Games Played'];
+
+function setupQuadrant(){
+  const xSel = document.getElementById('quad-x');
+  const ySel = document.getElementById('quad-y');
+  const sSel = document.getElementById('quad-size');
+  xSel.innerHTML = QUAD_AXIS_STATS.map(c=>`<option value="${c}">${displayLabel(c)}</option>`).join('');
+  ySel.innerHTML = QUAD_AXIS_STATS.map(c=>`<option value="${c}">${displayLabel(c)}</option>`).join('');
+  sSel.innerHTML = QUAD_SIZE_STATS.map(c=>`<option value="${c}">${displayLabel(c)}</option>`).join('');
+  xSel.value = 'Pass Accuracy';
+  ySel.value = 'Big Chances Created per 60';
+  sSel.value = 'Minutes Played';
+  [xSel, ySel, sSel].forEach(sel=> sel.addEventListener('change', renderQuadrant));
+  document.getElementById('quad-mingames').addEventListener('input', renderQuadrant);
+  renderQuadrant();
+}
+
+function isPercentStat(key){ return key==='Pass Accuracy' || key==='Dribble Accuracy'; }
+
+// рачуна лепе границе осе на основу стварног опсега вредности, уместо фиксног максимума
+function quadAxisBounds(vals, key){
+  const clean = vals.filter(v=>v!=null && !Number.isNaN(v));
+  if(!clean.length) return {min:0, max:1};
+  let min = Math.min(...clean), max = Math.max(...clean);
+  if(min===max){
+    const delta = Math.max(1, Math.abs(min)*0.15);
+    min -= delta; max += delta;
+  }
+  const pad = (max-min)*0.14;
+  let lo = min - pad, hi = max + pad;
+  if(isPercentStat(key)){
+    lo = Math.max(0, lo);
+    hi = Math.min(100, hi);
+  } else {
+    lo = Math.max(0, lo);
+  }
+  // заокруживање ка споља на најближи цео број, да осе не приказују ружне децимале
+  lo = Math.floor(lo);
+  hi = Math.ceil(hi);
+  if(isPercentStat(key)){
+    lo = Math.max(0, lo);
+    hi = Math.min(100, hi);
+  }
+  if(hi<=lo) hi = lo+1;
+  return {min:lo, max:hi};
+}
+
+function renderQuadrant(){
+  const xk = document.getElementById('quad-x').value;
+  const yk = document.getElementById('quad-y').value;
+  const sk = document.getElementById('quad-size').value;
+  const minGames = parseInt(document.getElementById('quad-mingames').value)||1;
+  document.getElementById('quad-mg-val').textContent = minGames;
+  const data = PLAYER_STATS.filter(p=>p[xk]!=null && p[yk]!=null && (p['Minutes Played']||0)>0 && (p['Games Played']||0)>=minGames);
+  if(!data.length){ destroyChart('quadChart'); return; }
+
+  const xMean = data.reduce((s,p)=>s+(p[xk]||0),0)/data.length;
+  const yMean = data.reduce((s,p)=>s+(p[yk]||0),0)/data.length;
+  const maxSize = Math.max(...data.map(p=>p[sk]||0),1);
+  const xBounds = quadAxisBounds(data.map(p=>p[xk]), xk);
+  const yBounds = quadAxisBounds(data.map(p=>p[yk]), yk);
+
+  // боја тачке по квадранту: горе-десно = позитивно (зелено), доле-лево = негативно (розе),
+  // мешовите комбинације = неутрално
+  const POS = {bg:'rgba(46,163,99,0.75)', border:'#1f7a4d'};
+  const NEG = {bg:'rgba(233,0,82,0.68)', border:'#a30039'};
+  const MIX = {bg:'rgba(157,143,161,0.62)', border:'#6b5870'};
+  const quadColor = (x,y)=>{
+    if(x>=xMean && y>=yMean) return POS;
+    if(x<xMean && y<yMean) return NEG;
+    return MIX;
+  };
+
+  const points = data.map(p=>{
+    const c = quadColor(p[xk]||0, p[yk]||0);
+    return { x:p[xk]||0, y:p[yk]||0, r: 5+(p[sk]||0)/maxSize*18, name:p['Player Name'], bg:c.bg, border:c.border };
+  });
+
+  const fmtAxisVal = (v,key)=> isPercentStat(key) ? fmtNum(v,1)+'%' : fmtNum(v,1);
+
+  const legendEl = document.getElementById('quad-legend-hint');
+  if(legendEl){
+    legendEl.innerHTML = `Величина тачке = <b>${displayLabel(sk)}</b> &nbsp;•&nbsp; `+
+      `<span style="color:#1f7a4d;font-weight:700;">●</span> изнад просека у оба правца &nbsp; `+
+      `<span style="color:#a30039;font-weight:700;">●</span> испод просека у оба правца &nbsp; `+
+      `<span style="color:#6b5870;font-weight:700;">●</span> мешовито`;
+  }
+
+  destroyChart('quadChart');
+  const ctx = document.getElementById('quadChart').getContext('2d');
+  charts.quadChart = new Chart(ctx, {
+    type:'scatter',
+    data:{ datasets:[{
+      label:'Играчи',
+      data: points,
+      backgroundColor: points.map(p=>p.bg),
+      borderColor: points.map(p=>p.border),
+      borderWidth: 1.5,
+    }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      parsing:false,
+      layout:{ padding:{top:28, right:12} },
+      elements:{ point:{ radius:(c)=> c.raw ? c.raw.r : 4, hoverRadius:(c)=> c.raw ? c.raw.r+2 : 6 } },
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:(c)=> `${c.raw.name}: ${displayLabel(xk)}=${fmtAxisVal(c.raw.x,xk)}, ${displayLabel(yk)}=${fmtAxisVal(c.raw.y,yk)}` } } },
+      scales:{
+        x:{ min:xBounds.min, max:xBounds.max, title:{display:true,text:displayLabel(xk),color:'#6b5870',font:{weight:700}},
+            grid:{color:'#e2d9e6'}, ticks:{color:'#9d8fa1', callback:(v)=> isPercentStat(xk) ? v+'%' : v } },
+        y:{ min:yBounds.min, max:yBounds.max, title:{display:true,text:displayLabel(yk),color:'#6b5870',font:{weight:700}},
+            grid:{color:'#e2d9e6'}, ticks:{color:'#9d8fa1', callback:(v)=> isPercentStat(yk) ? v+'%' : v } }
+      }
+    },
+    plugins:[{
+      id:'quadrantBackground',
+      beforeDatasetsDraw(chart){
+        const {ctx, chartArea, scales} = chart;
+        const xPix = scales.x.getPixelForValue(xMean);
+        const yPix = scales.y.getPixelForValue(yMean);
+
+        // сенчење сва четири квадранта
+        ctx.save();
+        ctx.fillStyle = 'rgba(46,163,99,0.09)';
+        ctx.fillRect(xPix, chartArea.top, chartArea.right-xPix, yPix-chartArea.top);
+        ctx.fillStyle = 'rgba(233,0,82,0.08)';
+        ctx.fillRect(chartArea.left, yPix, xPix-chartArea.left, chartArea.bottom-yPix);
+        ctx.fillStyle = 'rgba(157,143,161,0.07)';
+        ctx.fillRect(chartArea.left, chartArea.top, xPix-chartArea.left, yPix-chartArea.top);
+        ctx.fillRect(xPix, yPix, chartArea.right-xPix, chartArea.bottom-yPix);
+        ctx.restore();
+
+        // испрекидане линије просека
+        ctx.save();
+        ctx.strokeStyle = '#8d7a93';
+        ctx.setLineDash([5,4]);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(xPix, chartArea.top); ctx.lineTo(xPix, chartArea.bottom); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(chartArea.left, yPix); ctx.lineTo(chartArea.right, yPix); ctx.stroke();
+        ctx.restore();
+
+        // натписи за сва четири квадранта
+        ctx.save();
+        ctx.font = '700 10px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+        const pad = 8;
+        if(xPix < chartArea.right-pad && yPix > chartArea.top+pad){
+          ctx.fillStyle = '#1f7a4d'; ctx.textAlign='right'; ctx.textBaseline='top';
+          ctx.fillText('изнад просека у оба правца', chartArea.right-6, chartArea.top+6);
+        }
+        if(xPix > chartArea.left+pad && yPix < chartArea.bottom-pad){
+          ctx.fillStyle = '#a30039'; ctx.textAlign='left'; ctx.textBaseline='bottom';
+          ctx.fillText('испод просека у оба правца', chartArea.left+6, chartArea.bottom-6);
+        }
+        if(xPix > chartArea.left+pad && yPix > chartArea.top+pad){
+          ctx.fillStyle = '#6b5870'; ctx.textAlign='left'; ctx.textBaseline='top';
+          ctx.fillText(`изнад просека: ${displayLabel(yk)}`, chartArea.left+6, chartArea.top+6);
+        }
+        if(xPix < chartArea.right-pad && yPix < chartArea.bottom-pad){
+          ctx.fillStyle = '#6b5870'; ctx.textAlign='right'; ctx.textBaseline='bottom';
+          ctx.fillText(`изнад просека: ${displayLabel(xk)}`, chartArea.right-6, chartArea.bottom-6);
+        }
+        ctx.restore();
+      },
+      afterDatasetsDraw(chart){
+        const meta = chart.getDatasetMeta(0);
+        const {ctx} = chart;
+        ctx.save();
+        ctx.font = '600 10px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+        ctx.fillStyle = '#37003c';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        meta.data.forEach((point, i)=>{
+          const raw = points[i];
+          ctx.fillText(raw.name, point.x, point.y - raw.r - 3);
+        });
+        ctx.restore();
+      }
+    }]
+  });
+}
+
+</script>
+<script>
+// ================= НАГРАДЕ =================
+const LEADERBOARD_OPTIONS = {
+  'Голови на 60 минута':'Goals per 60','Асистенције на 60 минута':'Assists per 60',
+  'Голови + асистенције на 60 минута':'Goal Contributions per 60','Створене шансе на 60 минута':'Big Chances Created per 60',
+  'Шутеви у оквир на 60 минута':'Shots on Goal per 60','Успешна додавања на 60 минута':'Successful passes per 60',
+  'Успешни дриблинзи на 60 минута':'Successful dribbles per 60','Освојени дуели на 60 минута':'Tackles Won per 60',
+  'Пресечене лопте на 60 минута':'Interceptions per 60','Одбране на 60 минута':'Saves per 60',
+  'Прецизност паса':'Pass Accuracy','Бодови по термину':'Points per Game',
+  'Укупно голова':'Goals','Укупно асистенција':'Assists'
+};
+function renderAwardsPage(){
+  const sel = document.getElementById('award-metric');
+  sel.innerHTML = Object.keys(LEADERBOARD_OPTIONS).map(k=>`<option value="${k}">${k}</option>`).join('');
+  sel.addEventListener('change', renderLeaderboard);
+  document.getElementById('award-mingames').addEventListener('input', renderLeaderboard);
+  renderLeaderboard();
+
+  const records = singleGameRecords(TERMINI);
+  document.getElementById('season-records').innerHTML = records.map(r=>`
+    <div class="record-card">
+      <div>
+        <div class="record-stat">${r.stat}</div>
+        <div class="record-player js-player-link" data-player="${r.player}"><span class="player-link-name">${r.player}</span></div>
+        <div class="record-meta"><a href="#" class="js-game-link" data-game="${r.date}">${formatDateStr(r.date)}</a> · ${teamLabel(r.team)}</div>
+      </div>
+      <div class="record-value">${r.value}</div>
+    </div>`).join('');
+}
+function renderLeaderboard(){
+  const label = document.getElementById('award-metric').value;
+  const col = LEADERBOARD_OPTIONS[label];
+  const minGames = parseInt(document.getElementById('award-mingames').value)||1;
+  document.getElementById('award-mg-val').textContent = minGames;
+  const top = PLAYER_STATS.filter(p=>p[col]!=null && (p['Games Played']||0)>=minGames).sort((a,b)=>b[col]-a[col]).slice(0,10);
+  const max = Math.max(...top.map(p=>p[col]||0),1);
+  document.getElementById('leaderboard-bars').innerHTML = top.length ? top.map(p=>`
+    <div class="bar-row">
+      <div class="bar-name js-player-link" data-player="${p['Player Name']}"><span class="player-link-name">${p['Player Name']}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(p[col]/max*100).toFixed(1)}%"></div></div>
+      <div class="bar-val">${col.includes('Accuracy')? p[col].toFixed(1) : fmtNum(p[col],1)}</div>
+    </div>`).join('') : '<p class="hint">Нема играча за изабрани праг термина.</p>';
+}
+
+// ================= ОЦЕНЕ =================
+function renderRatingsPage(){
+  const top3 = RATING_SUMMARY.slice(0,3);
+  const order = [top3[1], top3[0], top3[2]].filter(Boolean);
+  const cls = ['second','first','third'];
+  document.getElementById('rating-podium').innerHTML = order.map((s,i)=>`
+    <div class="podium-item ${cls[i]}">
+      <div class="podium-rank">${cls[i]==='first'?'🥇':cls[i]==='second'?'🥈':'🥉'}</div>
+      <div class="podium-name js-player-link" data-player="${s.player}"><span class="player-link-name">${s.player}</span></div>
+      <div class="podium-value">${s.avg.toFixed(1)}</div>
+      <div class="metric-sub">${s.matches} партија</div>
+    </div>`).join('');
+
+  const cols = [
+    {key:'rank', label:'#'},
+    {key:'player', label:'Играч', isPlayer:true},
+    {key:'avg', label:'Просек', format:v=>v.toFixed(1)},
+    {key:'best', label:'Најбоља'},
+    {key:'worst', label:'Најслабија'},
+    {key:'excellent', label:'7.5+ партија'},
+    {key:'matches', label:'Партије'},
+  ];
+  const rows = RATING_SUMMARY.map((s,i)=>({...s, rank:i+1}));
+  buildSortableTable(document.getElementById('ratings-table'), cols, rows, {defaultSort:'avg'});
+
+  const psel = document.getElementById('rating-player-select');
+  psel.innerHTML = srSortBy(RATING_SUMMARY, s=>s.player).map(s=>`<option value="${s.player}">${s.player}</option>`).join('');
+  psel.addEventListener('change', renderRatingTrend);
+  renderRatingTrend();
+}
+function renderRatingTrend(){
+  const player = document.getElementById('rating-player-select').value || RATING_SUMMARY[0].player;
+  const rows = MATCH_RATINGS.filter(m=>m.player===player).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  destroyChart('ratingTrendChart');
+  const ctx = document.getElementById('ratingTrendChart').getContext('2d');
+  charts.ratingTrendChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels: rows.map(r=>formatDateStr(r.date)),
+      datasets:[{ label:'Оцена', data: rows.map(r=>r.rating), borderColor:'#e90052',
+        backgroundColor:'rgba(224,162,58,0.15)', fill:true, tension:0.25, pointRadius:3,
+        segment:{ borderColor: ctx=> '#e90052' } }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{display:false}}, y:{min:2, max:10.5} }, plugins:{legend:{display:false}} }
+  });
+}
+
+// ================= ИСТОРИЈА ТЕРМИНА =================
+function teamBadge(team){
+  const letter = teamLabel(team).charAt(0);
+  return `<div class="team-badge team-badge-${team}">${letter}</div>`;
+}
+function teamPlayersListHtml(rows, team){
+  const names = [...new Set(rows.filter(r=>r.Team===team).map(r=>transliterate(r['Player Name'])))];
+  const sorted = srSortBy(names, n=>n);
+  return `<div class="mc-team-players">${sorted.map(n=>`<div class="js-player-link" data-player="${n}"><span class="player-link-name">${n}</span></div>`).join('')}</div>`;
+}
+const TEAM_STAT_DEFS = [
+  {key:'Successful passes', label:'Успешна додавања'},
+  {key:'Shots on Goal',     label:'Шутеви у оквиру гола'},
+  {key:'Total Shots',       label:'Укупно шутева'},
+  {key:'Big Chances Created', label:'Велике шансе'},
+  {key:'Successful dribbles', label:'Успешни дриблинзи'},
+  {key:'Tackles Won',       label:'Освојени дуели'},
+  {key:'Interceptions',     label:'Пресецања'},
+  {key:'Fouls',             label:'Фаулови'},
+  {key:'Corners Taken',     label:'Корнери'},
+  {key:'Saves',             label:'Одбране'},
+];
+function renderTeamStatsCompare(rows, teamNames){
+  const container = document.getElementById('game-team-stats');
+  if(!container) return;
+  if(!rows.length || teamNames.length!==2){
+    container.innerHTML = '<p class="hint">Тимска статистика није доступна за овај термин.</p>';
+    return;
+  }
+  const sumFor = (team, key) => rows.filter(r=>r.Team===team).reduce((s,r)=>s+(Number(r[key])||0),0);
+  const rowsHtml = TEAM_STAT_DEFS.map(def=>{
+    const a = sumFor(teamNames[0], def.key);
+    const b = sumFor(teamNames[1], def.key);
+    const total = a+b;
+    const pctA = total>0 ? (a/total*100) : 50;
+    const pctB = 100-pctA;
+    return `<div class="team-stat-row">
+      <div class="team-stat-values">
+        <span class="tsv tsv-left">${fmtNum(a,0)}</span>
+        <span class="team-stat-label">${def.label}</span>
+        <span class="tsv tsv-right">${fmtNum(b,0)}</span>
+      </div>
+      <div class="team-stat-bar">
+        <div class="team-stat-bar-seg left" style="width:${pctA.toFixed(1)}%"></div>
+        <div class="team-stat-bar-seg right" style="width:${pctB.toFixed(1)}%"></div>
+      </div>
+    </div>`;
+  }).join('');
+  container.innerHTML = `
+    <div class="team-stats-header">
+      <div class="tsh-team tsh-left">${teamBadge(teamNames[0])}<span>${teamLabel(teamNames[0])}</span></div>
+      <div class="tsh-team tsh-right"><span>${teamLabel(teamNames[1])}</span>${teamBadge(teamNames[1])}</div>
+    </div>
+    ${rowsHtml}
+  `;
+}
+function renderHistoryPage(){
+  const sel = document.getElementById('game-select');
+  sel.innerHTML = ALL_GAMES.map((d,i)=>`<option value="${d}">Термин ${i+1}: ${formatDateStr(d)}</option>`).join('');
+  sel.selectedIndex = 0;
+  sel.addEventListener('change', renderGameDetail);
+  renderGameDetail();
+}
+function renderGameDetail(){
+  const date = document.getElementById('game-select').value || ALL_GAMES[0];
+  const gameNo = ALL_GAMES.indexOf(date)+1;
+  const rows = TERMINI.filter(r=>r.Date===date);
+  const teams = {};
+  rows.forEach(r=>{ teams[r.Team] = (teams[r.Team]||0); });
+  const teamNames = Object.keys(teams);
+  let scoreHtml = `<div class="mc-heading">Термин ${gameNo}</div>`;
+  if(teamNames.length===2){
+    const goalsByTeam = {};
+    teamNames.forEach(t=> goalsByTeam[t] = rows.filter(r=>r.Team===t).reduce((s,r)=>s+(r.Goals||0),0));
+    scoreHtml += `<div class="match-center-score">
+      <div class="mc-team">${teamBadge(teamNames[0])}<span class="team-tag mc-team-tag team-${teamNames[0]}">${teamLabel(teamNames[0])}</span>${teamPlayersListHtml(rows, teamNames[0])}</div>
+      <div class="mc-score">${goalsByTeam[teamNames[0]]} : ${goalsByTeam[teamNames[1]]}</div>
+      <div class="mc-team">${teamBadge(teamNames[1])}<span class="team-tag mc-team-tag team-${teamNames[1]}">${teamLabel(teamNames[1])}</span>${teamPlayersListHtml(rows, teamNames[1])}</div>
+    </div>`;
+  }
+  document.getElementById('game-score').innerHTML = scoreHtml;
+  renderTeamStatsCompare(rows, teamNames);
+
+  const cols = [
+    {key:'Team', label:'Екипа', format:v=>`<span class="team-tag team-${v}">${teamLabel(v)}</span>`},
+    {key:'Player Name', label:'Играч', isPlayer:true},
+    {key:'Goals', label:'Голови'}, {key:'Assists', label:'Асистенције'},
+    {key:'Big Chances Created', label:'Шансе'}, {key:'Successful passes', label:'Усп. додавања'},
+    {key:'Tackles Won', label:'Дуели'}, {key:'Interceptions', label:'Пресеч.'},
+    {key:'Saves', label:'Одбране'}, {key:'Goals Conceded', label:'Прим. голови'},
+    {key:'Minutes Played', label:'Минути'},
+  ];
+  buildSortableTable(document.getElementById('game-stats-table'), cols, rows, {defaultSort:'Goals'});
+
+  const goals = GOLOVI.filter(g=>g.Date===date).sort((a,b)=>(a.Minute||0)-(b.Minute||0));
+
+  function goalEntryHtml(g){
+    const isOG = /^OG\s*-\s*/i.test(g.Goalscorer||'');
+    const scorerName = isOG ? g.Goalscorer.replace(/^OG\s*-\s*/i,'').trim() : g.Goalscorer;
+    const minuteStr = g.Minute!=null ? Math.round(g.Minute)+"'" : '';
+    return `<div class="mc-goal-entry">
+      <span class="mc-ball">⚽</span>
+      <div class="mc-goal-info">
+        <div class="mc-goal-line"><span class="js-player-link" data-player="${scorerName}"><span class="player-link-name">${scorerName}</span></span> <span class="mc-minute">${minuteStr}</span>${isOG?' <span class="mc-og">(аутогол)</span>':''}</div>
+        ${g.Assist ? `<div class="mc-assist">(<span class="js-player-link" data-player="${g.Assist}"><span class="player-link-name">${g.Assist}</span></span>)</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  let goalsHtml;
+  if(teamNames.length===2 && goals.length){
+    const leftGoals = goals.filter(g=>g.Team===teamNames[0]);
+    const rightGoals = goals.filter(g=>g.Team===teamNames[1]);
+    goalsHtml = `<div class="match-center-goals">
+      <div class="mc-col mc-left">${leftGoals.map(goalEntryHtml).join('') || '<p class="hint">Нема голова.</p>'}</div>
+      <div class="mc-col mc-right">${rightGoals.map(goalEntryHtml).join('') || '<p class="hint">Нема голова.</p>'}</div>
+    </div>`;
+  } else {
+    goalsHtml = goals.length ? `<div class="match-center-goals"><div class="mc-col mc-left">${goals.map(goalEntryHtml).join('')}</div></div>` : '';
+  }
+  document.getElementById('game-goals-list').innerHTML = goalsHtml || '<p class="hint">Нема забележених голова за овај термин.</p>';
+}
+
+</script>
+<script>
+window.__dataLoadError = null;
+</script>
+<!-- Подаци се сада учитавају из спољашњих .js фајлова (data/termini.js и
+     data/golovi.js) уместо да буду уграђени у сам HTML. Ови фајлови се
+     регенеришу покретањем update_site.py, без икаквог дирања у index.html.
+     Користимо обичне <script src> тагове (не fetch!) јер fetch на локалним
+     (file://) фајловима браузери блокирају из безбедносних разлога, док
+     <script src> ради без проблема и без потребе за локалним сервером. -->
+<script src="data/termini.js" onerror="window.__dataLoadError='data/termini.js'"></script>
+<script src="data/golovi.js" onerror="window.__dataLoadError='data/golovi.js'"></script>
+<script>
+darkChartDefaults();
+
+function showDataLoadError(missingFile){
+  document.body.innerHTML = '<div style="font-family:sans-serif;max-width:640px;margin:3rem auto;padding:1.5rem;'
+    + 'border:1px solid #e2d9e6;border-radius:12px;background:#fff;color:#20051f;">'
+    + '<h2 style="margin-top:0;color:#37003c;">Није могуће учитати податке</h2>'
+    + '<p>Фајл <code>' + missingFile + '</code> није пронађен поред <code>index.html</code>.</p>'
+    + '<p><b>Решење:</b> покрени <code>update_site.py</code> (у истом фолдеру где су '
+    + '<code>index.html</code> и Excel фајлови) да би се направио фолдер <code>data/</code> '
+    + 'са потребним фајловима, па поново отвори <code>index.html</code>.</p>'
+    + '</div>';
+}
+
+if(window.__dataLoadError){
+  showDataLoadError(window.__dataLoadError);
+} else if(typeof TERMINI_DATA === 'undefined' || typeof GOLOVI_DATA === 'undefined'){
+  showDataLoadError('data/termini.js или data/golovi.js');
+} else {
+  initApp(TERMINI_DATA, GOLOVI_DATA);
+}
+</script>
+<button id="view-mode-toggle" type="button"></button>
+<style>
+#view-mode-toggle{
+  position:fixed; bottom:16px; right:16px; z-index:9999;
+  background:var(--purple); color:#fff; border:none; border-radius:999px;
+  padding:0.6rem 1rem; font-size:0.78rem; font-weight:700; letter-spacing:.02em;
+  box-shadow:0 4px 14px rgba(0,0,0,0.25); cursor:pointer; opacity:0.9;
+}
+#view-mode-toggle:active{opacity:1;}
+</style>
+<script>
+(function(){
+  var btn = document.getElementById('view-mode-toggle');
+  function currentMode(){
+    try{ return localStorage.getItem('fkBarandaViewMode') === 'mobile' ? 'mobile' : 'desktop'; }
+    catch(e){ return 'desktop'; }
+  }
+  function paintBtn(){
+    btn.textContent = currentMode()==='desktop' ? '📱 Мобилна верзија' : '🖥️ Верзија за рачунар';
+  }
+  btn.addEventListener('click', function(){
+    var next = currentMode()==='desktop' ? 'mobile' : 'desktop';
+    try{ localStorage.setItem('fkBarandaViewMode', next); }catch(e){}
+    location.reload();
+  });
+  paintBtn();
+})();
+</script>
+</body>
+</html>
