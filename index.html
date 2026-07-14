@@ -1057,6 +1057,13 @@ function renderPlayersPage(){
   cmpSelect.innerHTML = playersAZ.map(p=>`<option value="${p['Player Name']}">${p['Player Name']}</option>`).join('');
   document.getElementById('compare-btn').addEventListener('click', renderComparison);
 
+  // подразумевано поређење: играч изабран на врху странице + следећи играч са листе (корисник може сам да промени)
+  const currentPlayer = select.value;
+  const currentIdx = playersAZ.findIndex(p=>p['Player Name']===currentPlayer);
+  const otherPlayer = playersAZ.length>1 ? playersAZ[(currentIdx+1) % playersAZ.length]['Player Name'] : null;
+  Array.from(cmpSelect.options).forEach(o=>{ o.selected = (o.value===currentPlayer || o.value===otherPlayer); });
+  renderComparison();
+
   renderPlayerProfile();
 }
 
@@ -1150,7 +1157,7 @@ function renderProgressChart(player){
 function renderComparison(){
   const selected = Array.from(document.getElementById('compare-players').selectedOptions).map(o=>o.value).slice(0,5);
   if(selected.length<2) return;
-  const metrics = ['Goals','Assists','Successful passes','Tackles Won','Interceptions','Saves'];
+  const metrics = ['Goals per 60','Assists per 60','Successful passes per 60','Tackles Won per 60','Interceptions per 60','Saves per 60'];
   const colors = ['#37003c','#0091c2','#e90052','#f87171','#a78bfa'];
   destroyChart('compareChart');
   const ctx = document.getElementById('compareChart').getContext('2d');
