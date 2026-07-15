@@ -269,7 +269,7 @@ table.heatmap td.empty{background:transparent;color:var(--text-faint);}
     <!-- ПОЧЕТНА -->
     <section class="page active" id="page-home">
       <h1 class="page-title">🏆 ФК Баранда - статистика сезоне 2025/26.</h1>
-      <p class="hint" style="margin-top:-0.5rem;margin-bottom:0.8rem;">од 18. 8. 2025. до 25. 5. 2026.</p>
+      <p class="hint" style="margin-top:-0.5rem;margin-bottom:0.8rem;">Од 18. 8. 2025. до 25. 5. 2026.</p>
       <div class="metric-row" id="home-metrics"></div>
       <h2 class="section-title">Истакнути појединци</h2>
       <div class="grid-3" id="home-spotlight" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;"></div>
@@ -302,8 +302,10 @@ table.heatmap td.empty{background:transparent;color:var(--text-faint);}
 
       <div class="grid-2">
         <div class="panel">
-          <h2 class="section-title" style="margin-top:0;">Профил по перцентилима</h2>
+          <h2 class="section-title" style="margin-top:0;">Параметри играча</h2>
           <div style="height:420px;"><canvas id="radarChart"></canvas></div>
+          <p class="hint" style="margin-top:0.8rem;">Овај график за сваку од девет особина (четири нападачке, четири одбрамбене и прецизност паса) говори од колико процената осталих играча је одабрани играч бољи.</p>
+          <div id="radar-area-stat"></div>
         </div>
         <div class="panel">
           <h2 class="section-title" style="margin-top:0;">Кључне статистике</h2>
@@ -313,7 +315,7 @@ table.heatmap td.empty{background:transparent;color:var(--text-faint);}
 
       <div class="panel">
         <div class="controls-row" style="margin-bottom:0.4rem;">
-          <h2 class="section-title" style="margin:0;">График напретка по терминима</h2>
+          <h2 class="section-title" style="margin:0;">Форма играча по терминима</h2>
           <div class="ctrl" style="margin-left:auto;">
             <label class="ctrl-label">Статистика</label>
             <select id="progress-metric"></select>
@@ -350,7 +352,7 @@ table.heatmap td.empty{background:transparent;color:var(--text-faint);}
         </div>
       </div>
       <div class="panel">
-        <h2 class="section-title" style="margin-top:0;">Најбољи и најгори парови (исти тим)</h2>
+        <h2 class="section-title" style="margin-top:0;">Најбољи и најлошији тандеми (исти тим)</h2>
         <div class="grid-2">
           <div><h2 class="section-title" style="font-size:0.85rem;color:var(--green);">🔥 Најбоља хемија</h2><div id="chem-best"></div></div>
           <div><h2 class="section-title" style="font-size:0.85rem;color:var(--red);">❄️ Најслабија хемија</h2><div id="chem-worst"></div></div>
@@ -382,7 +384,7 @@ table.heatmap td.empty{background:transparent;color:var(--text-faint);}
         <div style="height:300px;"><canvas id="trendChart"></canvas></div>
       </div>
       <div class="panel">
-        <h2 class="section-title" style="margin-top:0;">Голови по месецима</h2>
+        <h2 class="section-title" style="margin-top:0;">Погоци по месецима</h2>
         <div style="height:300px;"><canvas id="goalsMonthChart"></canvas></div>
       </div>
       <div class="panel">
@@ -565,23 +567,24 @@ const CORE_STATS = ["Goals","Assists","Big Chances Created","Shots on Goal","Tot
   "Successful passes","Unsuccessful passes","Successful dribbles","Unsuccessful dribbles",
   "Tackles Won","Interceptions","Blocks","Saves","Goals Conceded","Corners Taken","Hit Woodwork","Own Goals"];
 const PER60_EXCLUDE = new Set(["Unsuccessful passes","Unsuccessful dribbles"]);
-const RADAR_STATS = ["Goals per 60","Assists per 60","Goal Contributions per 60","Big Chances Created per 60",
-  "Shots on Goal per 60","Successful passes per 60","Successful dribbles per 60","Tackles Won per 60","Interceptions per 60"];
+const RADAR_STATS = ["Goals per 60","Assists per 60","Big Chances Created per 60","Successful dribbles per 60",
+  "Pass Accuracy","Blocks per 60","Tackles Won per 60","Interceptions per 60","Save Percentage"];
 
 const DISPLAY_LABELS = {
-"Goals":"Голови","Assists":"Асистенције","Goal Contributions":"Голови + асистенције",
-"Big Chances Created":"Створене шансе","Shots on Goal":"Шутеви у оквир","Hit Woodwork":"Погођен оквир гола",
+"Goals":"Погоци","Assists":"Асистенције","Goal Contributions":"Погоци + асистенције",
+"Big Chances Created":"Створене прилике","Shots on Goal":"Шутеви у оквир","Hit Woodwork":"Погођен оквир гола",
 "Shots off Goal":"Шутеви ван оквира","Blocked Shots":"Блокирани шутеви","Total Shots":"Укупно шутева",
-"Blocks":"Блокаде","Successful passes":"Успешна додавања","Unsuccessful passes":"Неуспешна додавања",
+"Blocks":"Изблокирани ударци","Successful passes":"Успешна додавања","Unsuccessful passes":"Неуспешна додавања",
 "Total Passes":"Укупно додавања","Pass Accuracy":"Прецизност паса (%)","Successful dribbles":"Успешни дриблинзи",
 "Unsuccessful dribbles":"Неуспешни дриблинзи","Total Dribbles":"Укупно дриблинга","Dribble Accuracy":"Успешност дриблинга (%)",
 "Tackles Won":"Освојени дуели","Interceptions":"Пресечене лопте","Fouls Against":"Фаулови над играчем",
-"Fouls":"Направљени фаулови","Saves":"Одбране","Goals Conceded":"Примљени голови","Corners Taken":"Изведени корнери",
+"Fouls":"Направљени фаулови","Saves":"Одбране","Goals Conceded":"Примљени погоци","Corners Taken":"Изведени корнери",
 "Own Goals":"Аутоголови","Penalties Taken":"Изведени пенали","Penalties scored":"Постигнути пенали",
+"Save Percentage":"Одбрањени ударци (%)",
 "Team Pass Accuracy":"Прецизност додавања",
 "Points":"Бодови","Minutes Played":"Минути","Games Played":"Термини","Points per Game":"Бодови по термину",
-"Player Name":"Играч","Team":"Екипа","Left F. Goals":"Голови левом ногом","Right F. Goals":"Голови десном ногом",
-"Header Goals":"Голови главом","Body Goals":"Голови телом","Events":"Догађаји"
+"Player Name":"Играч","Team":"Екипа","Left F. Goals":"Погоци левом ногом","Right F. Goals":"Погоци десном ногом",
+"Header Goals":"Погоци главом","Body Goals":"Погоци телом","Events":"Догађаји"
 };
 function displayLabel(col){
   if(DISPLAY_LABELS[col]) return DISPLAY_LABELS[col];
@@ -624,6 +627,10 @@ function buildPlayerStats(rows){
       const tot = p["Successful dribbles"]+p["Unsuccessful dribbles"];
       p["Total Dribbles"] = tot;
       p["Dribble Accuracy"] = round2(safeDiv(p["Successful dribbles"], tot)*100);
+    }
+    if(p["Saves"]!=null && p["Goals Conceded"]!=null){
+      const tot = p["Saves"]+p["Goals Conceded"];
+      p["Save Percentage"] = round2(safeDiv(p["Saves"], tot)*100);
     }
     const minutes = p["Minutes Played"];
     if(minutes){
@@ -761,6 +768,37 @@ function percentileRank(values, target){
   sorted.forEach(v=>{ if(v<=target) countLE++; });
   return countLE/sorted.length*100;
 }
+// површина правилног деветоугла (или n-тоугла) чија су "темена" на процентним
+// вредностима values[i] (0-100), као проценат максималне могуће површине
+// (кад би сви values били 100). За правилан n-тоугао површина је
+// 0.5*sin(2π/n)*Σ(r_i*r_{i+1}), па sin(2π/n) скраћује са максимумом и остаје
+// само однос сума производа суседних "зракова".
+function radarAreaPercent(values){
+  const n = values.length;
+  if(n<3) return null;
+  let sum = 0;
+  for(let i=0;i<n;i++){ sum += (values[i]||0) * (values[(i+1)%n]||0); }
+  return sum / (n*100*100) * 100;
+}
+// проценат површине за сваког играча из групе (иста група = исто поређење,
+// исти "процентил" за све, па су површине међусобно упоредиве)
+function computeRadarAreasForGroup(players, cols){
+  const areas = {};
+  players.forEach(p=> areas[p['Player Name']] = null);
+  if(!cols.length) return areas;
+  const percentileMatrix = {};
+  players.forEach(p=> percentileMatrix[p['Player Name']] = []);
+  cols.forEach(c=>{
+    const vals = players.map(p=>p[c]||0);
+    players.forEach(p=>{
+      percentileMatrix[p['Player Name']].push(percentileRank(vals, p[c]||0));
+    });
+  });
+  players.forEach(p=>{
+    areas[p['Player Name']] = radarAreaPercent(percentileMatrix[p['Player Name']]);
+  });
+  return areas;
+}
 function buildRadarData(players, player, minGames, minMinutes){
   const filtered = applyPlayerFilters(players, minGames, minMinutes);
   const cols = RADAR_STATS.filter(c=> filtered.some(p=>p[c]!=null));
@@ -771,7 +809,9 @@ function buildRadarData(players, player, minGames, minMinutes){
     return round2(percentileRank(vals, target[c]||0));
   });
   const labels = cols.map(c=> displayLabel(c).replace(" на 60 мин",""));
-  return {labels, values};
+  // површине свих играча из исте (филтриране) групе - за рангирање по "розе површини"
+  const areas = computeRadarAreasForGroup(filtered, cols);
+  return {labels, values, areas};
 }
 
 // ---------------- single game records ----------------
@@ -968,7 +1008,7 @@ function renderHome(){
   const cards = [
     [ICONS.players,'Играчи', eligible.length, `играча је одиграло бар ${minGamesPct}% термина`, '#37003c'],
     [ICONS.games,'Термини', ALL_GAMES.length, 'одиграна термина', '#37003c'],
-    [ICONS.goals,'Голови', totalGoals, 'постигнути голови', '#37003c'],
+    [ICONS.goals,'Погоци', totalGoals, 'број постигнутих погодака', '#37003c'],
     [ICONS.assists,'Асистенције', totalAssists, 'забележене асистенције', '#0091c2'],
     [ICONS.minutes,'Минути', totalMinutes.toLocaleString('sr-RS'), 'укупно минута', '#e90052'],
   ];
@@ -984,10 +1024,10 @@ function renderHome(){
   // истакнути појединци (само међу играчима који испуњавају праг)
   const top = (col)=> [...eligible].sort((a,b)=>(b[col]||0)-(a[col]||0))[0];
   const spotlights = [
-    ['Најбољи стрелац', top('Goals'), 'Goals', 'голова'],
+    ['Најбољи стрелац', top('Goals'), 'Goals', 'погодака'],
     ['Најбољи асистент', top('Assists'), 'Assists', 'асистенција'],
-    ['Најбоља прецизност паса', [...eligible].filter(p=>p['Games Played']>=3).sort((a,b)=>(b['Pass Accuracy']||0)-(a['Pass Accuracy']||0))[0], 'Pass Accuracy', '% тачност'],
-    ['Најдуели', top('Tackles Won'), 'Tackles Won', 'освојених дуела'],
+    ['Најпрецизнији пас', [...eligible].filter(p=>p['Games Played']>=3).sort((a,b)=>(b['Pass Accuracy']||0)-(a['Pass Accuracy']||0))[0], 'Pass Accuracy', '% тачност'],
+    ['Највише термина', top('Games Played'), 'Games Played', 'одиграних термина'],
   ];
   document.getElementById('home-spotlight').innerHTML = spotlights.map(([label,p,col,unit])=> p ? `
     <div class="panel js-player-link" data-player="${p['Player Name']}" style="text-align:center;">
@@ -1007,13 +1047,13 @@ function renderHome(){
     {key:'Losses', label:'Порази'},
     {key:'Draws', label:'Нерешено'},
     {key:'Points per Game', label:'Бодови', format:v=>v==null?'-':v.toFixed(1)},
-    {key:'Goals', label:'Голови'},
+    {key:'Goals', label:'Погоци'},
     {key:'Assists', label:'Асистенције'},
     {key:'Goal Contributions', label:'Г+А'},
     {key:'Pass Accuracy', label:'Пас. %', format:v=>v==null?'-':v.toFixed(1)},
     {key:'Tackles Won', label:'Дуели'},
     {key:'Interceptions', label:'Пресеч.'},
-    {key:'Goals Conceded', label:'Прим. голови'},
+    {key:'Goals Conceded', label:'Прим. погоци'},
     {key:'Minutes Played', label:'Минути'},
   ];
   // add rank index
@@ -1091,13 +1131,31 @@ function renderPlayerProfile(){
       }
     });
   }
+  // розе површина деветоугла (укупна "снага" играча) + ранг у односу на остале играче из исте групе (исти праг мин. термина)
+  const areaEl = document.getElementById('radar-area-stat');
+  if(radar && radar.areas[player]!=null){
+    const ranking = Object.entries(radar.areas).filter(([,v])=>v!=null).sort((a,b)=>b[1]-a[1]);
+    const rank = ranking.findIndex(([name])=>name===player) + 1;
+    const areaPct = radar.areas[player];
+    areaEl.innerHTML = `
+      <div class="panel" style="padding:0.7rem 0.9rem;margin-top:0.6rem;margin-bottom:0;">
+        <div class="metric-label">Розе површина (укупна снага деветоугла)</div>
+        <div style="display:flex;align-items:baseline;gap:0.5rem;">
+          <div style="font-size:1.4rem;font-weight:800;color:var(--pink);">${areaPct.toFixed(1)}%</div>
+          ${rank ? `<div class="metric-sub">#${rank} од ${ranking.length} играча (при истом прагу термина)</div>` : ''}
+        </div>
+      </div>`;
+  } else {
+    areaEl.innerHTML = '';
+  }
 
   // key stats with rank (скалирано на 60 минута, осим прецизности паса)
   const filtered = applyPlayerFilters(PLAYER_STATS, minGames, minMinutes);
-  const keyStats = ['Goals per 60','Assists per 60','Big Chances Created per 60','Successful passes per 60','Pass Accuracy','Successful dribbles per 60','Tackles Won per 60','Interceptions per 60','Saves per 60','Goals Conceded per 60'];
+  const keyStats = ['Goals per 60','Assists per 60','Big Chances Created per 60','Successful dribbles per 60','Pass Accuracy','Blocks per 60','Tackles Won per 60','Interceptions per 60','Save Percentage'];
   document.getElementById('player-keystats').innerHTML = keyStats.filter(k=>p[k]!=null).map(k=>{
     const rank = player_stat_rank_js(filtered, player, k);
-    const val = k==='Pass Accuracy' ? (p[k]!=null? p[k].toFixed(1)+'%':'-') : fmtNum(p[k],1);
+    const isPct = (k==='Pass Accuracy' || k==='Save Percentage');
+    const val = isPct ? (p[k]!=null? p[k].toFixed(1)+'%':'-') : fmtNum(p[k],1);
     return `<div class="panel" style="padding:0.8rem 1rem;">
       <div class="metric-label">${displayLabel(k)}</div>
       <div style="display:flex;align-items:baseline;gap:0.5rem;">
@@ -1105,7 +1163,14 @@ function renderPlayerProfile(){
         ${rank? `<div class="metric-sub">#${rank} у екипи</div>`:''}
       </div>
     </div>`;
-  }).join('');
+  }).join('') + `
+    <div class="panel" style="padding:0.8rem 1rem;">
+      <div class="metric-label">Одиграни термини</div>
+      <div style="display:flex;align-items:baseline;gap:0.5rem;">
+        <div style="font-size:1.4rem;font-weight:800;">${p['Games Played']||0}</div>
+        <div class="metric-sub">${p['Minutes Played']? fmtNum(p['Minutes Played'],0)+' мин. укупно':''}</div>
+      </div>
+    </div>`;
 
   // progress line chart
   renderProgressChart(player);
@@ -1115,11 +1180,11 @@ function renderPlayerProfile(){
   const cols = [
     {key:'Date', label:'Термин', format:v=>`<a href="#" class="js-game-link" data-game="${v}">${formatDateStr(v)}</a>`},
     {key:'Team', label:'Екипа', format:v=>teamLabel(v)},
-    {key:'Goals', label:'Голови'}, {key:'Assists', label:'Асистенције'},
+    {key:'Goals', label:'Погоци'}, {key:'Assists', label:'Асистенције'},
     {key:'Successful passes', label:'Усп. додавања'}, {key:'Tackles Won', label:'Дуели'},
     {key:'Interceptions', label:'Пресеч.'}, {key:'Minutes Played', label:'Минути'},
   ];
-  buildSortableTable(document.getElementById('player-games-table'), cols, gameRows, {defaultSort:'Date'});
+  buildSortableTable(document.getElementById('player-games-table'), cols, gameRows, {defaultSort:'Date', defaultDir:1});
 }
 function player_stat_rank_js(filtered, player, column){
   const vals = filtered.map(p=>Number(p[column])||0);
@@ -1308,7 +1373,7 @@ function renderGoalsByMonth(){
   charts.goalsMonthChart = new Chart(ctx, {
     type:'bar',
     data:{ labels: months.map(m=>{ const [y,mo]=m.split('-'); return monthNames[parseInt(mo)-1]+' '+y.slice(2);}),
-      datasets:[{ label:'Голови', data: months.map(m=>byMonth[m]), backgroundColor:'#e90052' }]},
+      datasets:[{ label:'Погоци', data: months.map(m=>byMonth[m]), backgroundColor:'#e90052' }]},
     options:{ responsive:true, maintainAspectRatio:false, scales:{x:{grid:{display:false}}, y:{beginAtZero:true}}, plugins:{legend:{display:false}} }
   });
 }
@@ -1505,13 +1570,14 @@ function renderQuadrant(){
 <script>
 // ================= НАГРАДЕ =================
 const LEADERBOARD_OPTIONS = {
-  'Голови на 60 минута':'Goals per 60','Асистенције на 60 минута':'Assists per 60',
-  'Голови + асистенције на 60 минута':'Goal Contributions per 60','Створене шансе на 60 минута':'Big Chances Created per 60',
+  'Погоци на 60 минута':'Goals per 60','Асистенције на 60 минута':'Assists per 60',
+  'Погоци + асистенције на 60 минута':'Goal Contributions per 60','Створене прилике на 60 минута':'Big Chances Created per 60',
   'Шутеви у оквир на 60 минута':'Shots on Goal per 60','Успешна додавања на 60 минута':'Successful passes per 60',
   'Успешни дриблинзи на 60 минута':'Successful dribbles per 60','Освојени дуели на 60 минута':'Tackles Won per 60',
   'Пресечене лопте на 60 минута':'Interceptions per 60','Одбране на 60 минута':'Saves per 60',
   'Прецизност паса':'Pass Accuracy','Бодови по термину':'Points per Game',
-  'Укупно голова':'Goals','Укупно асистенција':'Assists'
+  'Укупно погодака':'Goals','Укупно асистенција':'Assists',
+  'Розе површина (укупна снага деветоугла)':'__RADAR_AREA__'
 };
 function renderAwardsPage(){
   const sel = document.getElementById('award-metric');
@@ -1536,6 +1602,22 @@ function renderLeaderboard(){
   const col = LEADERBOARD_OPTIONS[label];
   const minGames = parseInt(document.getElementById('award-mingames').value)||1;
   document.getElementById('award-mg-val').textContent = minGames;
+  if(col === '__RADAR_AREA__'){
+    const eligible = PLAYER_STATS.filter(p=>(p['Games Played']||0)>=minGames);
+    const cols = RADAR_STATS.filter(c=> eligible.some(p=>p[c]!=null));
+    const areas = computeRadarAreasForGroup(eligible, cols);
+    const top = eligible.filter(p=>areas[p['Player Name']]!=null)
+      .map(p=>({...p, __area: areas[p['Player Name']]}))
+      .sort((a,b)=>b.__area-a.__area).slice(0,10);
+    const max = Math.max(...top.map(p=>p.__area||0),1);
+    document.getElementById('leaderboard-bars').innerHTML = top.length ? top.map(p=>`
+      <div class="bar-row">
+        <div class="bar-name js-player-link" data-player="${p['Player Name']}"><span class="player-link-name">${p['Player Name']}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(p.__area/max*100).toFixed(1)}%"></div></div>
+        <div class="bar-val">${p.__area.toFixed(1)}%</div>
+      </div>`).join('') : '<p class="hint">Нема играча за изабрани праг термина.</p>';
+    return;
+  }
   const top = PLAYER_STATS.filter(p=>p[col]!=null && (p['Games Played']||0)>=minGames).sort((a,b)=>b[col]-a[col]).slice(0,10);
   const max = Math.max(...top.map(p=>p[col]||0),1);
   document.getElementById('leaderboard-bars').innerHTML = top.length ? top.map(p=>`
@@ -1606,7 +1688,7 @@ const TEAM_STAT_DEFS = [
   {key:'Successful passes', label:'Успешна додавања'},
   {key:'Shots on Goal',     label:'Шутеви у оквиру гола'},
   {key:'Total Shots',       label:'Укупно шутева'},
-  {key:'Big Chances Created', label:'Велике шансе'},
+  {key:'Big Chances Created', label:'Велике прилике'},
   {key:'Successful dribbles', label:'Успешни дриблинзи'},
   {key:'Tackles Won',       label:'Освојени дуели'},
   {key:'Interceptions',     label:'Пресецања'},
@@ -1678,10 +1760,10 @@ function renderGameDetail(){
   const cols = [
     {key:'Team', label:'Екипа', format:v=>`<span class="team-tag team-${v}">${teamLabel(v)}</span>`},
     {key:'Player Name', label:'Играч', isPlayer:true},
-    {key:'Goals', label:'Голови'}, {key:'Assists', label:'Асистенције'},
-    {key:'Big Chances Created', label:'Шансе'}, {key:'Successful passes', label:'Усп. додавања'},
+    {key:'Goals', label:'Погоци'}, {key:'Assists', label:'Асистенције'},
+    {key:'Big Chances Created', label:'Прилике'}, {key:'Successful passes', label:'Усп. додавања'},
     {key:'Tackles Won', label:'Дуели'}, {key:'Interceptions', label:'Пресеч.'},
-    {key:'Saves', label:'Одбране'}, {key:'Goals Conceded', label:'Прим. голови'},
+    {key:'Saves', label:'Одбране'}, {key:'Goals Conceded', label:'Прим. погоци'},
     {key:'Minutes Played', label:'Минути'},
   ];
   buildSortableTable(document.getElementById('game-stats-table'), cols, rows, {defaultSort:'Goals'});
@@ -1706,13 +1788,13 @@ function renderGameDetail(){
     const leftGoals = goals.filter(g=>g.Team===teamNames[0]);
     const rightGoals = goals.filter(g=>g.Team===teamNames[1]);
     goalsHtml = `<div class="match-center-goals">
-      <div class="mc-col mc-left">${leftGoals.map(goalEntryHtml).join('') || '<p class="hint">Нема голова.</p>'}</div>
-      <div class="mc-col mc-right">${rightGoals.map(goalEntryHtml).join('') || '<p class="hint">Нема голова.</p>'}</div>
+      <div class="mc-col mc-left">${leftGoals.map(goalEntryHtml).join('') || '<p class="hint">Нема погодака.</p>'}</div>
+      <div class="mc-col mc-right">${rightGoals.map(goalEntryHtml).join('') || '<p class="hint">Нема погодака.</p>'}</div>
     </div>`;
   } else {
     goalsHtml = goals.length ? `<div class="match-center-goals"><div class="mc-col mc-left">${goals.map(goalEntryHtml).join('')}</div></div>` : '';
   }
-  document.getElementById('game-goals-list').innerHTML = goalsHtml || '<p class="hint">Нема забележених голова за овај термин.</p>';
+  document.getElementById('game-goals-list').innerHTML = goalsHtml || '<p class="hint">Нема забележених погодака за овај термин.</p>';
 }
 
 </script>
