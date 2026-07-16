@@ -169,6 +169,19 @@ table.heatmap tfoot th.colfoot{writing-mode:vertical-rl;transform:rotate(180deg)
 .record-meta{color:var(--text-faint);font-size:0.72rem;}
 .record-value{font-size:1.6rem;font-weight:800;color:var(--pink);flex-shrink:0;}
 
+/* team impact (own/opponent) rows on player page */
+.impact-row{display:flex;justify-content:space-between;align-items:center;gap:0.7rem;
+  padding:0.5rem 0;border-bottom:1px solid var(--border);}
+.impact-row:last-child{border-bottom:none;}
+.impact-label{color:var(--text-dim);font-size:0.8rem;flex:1;min-width:0;}
+.impact-values{display:flex;align-items:baseline;gap:0.5rem;flex-shrink:0;}
+.impact-value{font-weight:800;font-size:0.95rem;}
+.impact-avg{font-size:0.66rem;color:var(--text-faint);white-space:nowrap;}
+.impact-delta{font-size:0.72rem;font-weight:700;padding:1px 7px;border-radius:8px;white-space:nowrap;min-width:3.4rem;text-align:center;}
+.impact-delta.up{color:var(--green);background:rgba(0,161,92,0.12);}
+.impact-delta.down{color:var(--red);background:rgba(216,17,89,0.10);}
+.impact-delta.flat{color:var(--text-faint);background:rgba(255,255,255,0.06);}
+
 /* match center — team badges + heading */
 .mc-heading{text-align:center;font-size:1.05rem;font-weight:800;color:var(--purple);text-transform:uppercase;
   letter-spacing:.06em;margin-bottom:0.7rem;}
@@ -331,16 +344,17 @@ table.heatmap tfoot th.colfoot{writing-mode:vertical-rl;transform:rotate(180deg)
         <div id="player-games-table"></div>
       </div>
 
-      <div class="panel">
-        <h2 class="section-title" style="margin-top:0;">Поређење играча</h2>
-        <div class="controls-row">
-          <div class="ctrl" style="flex:1;min-width:220px;">
-            <label class="ctrl-label">Изабери 2-5 играча (ctrl/cmd + клик)</label>
-            <select id="compare-players" multiple size="6" style="width:100%;"></select>
-          </div>
-          <button class="pill-btn active" id="compare-btn" style="height:2.2rem;">Упореди</button>
+      <div class="grid-2">
+        <div class="panel">
+          <h2 class="section-title" style="margin-top:0;">🟢 Утицај на своју екипу</h2>
+          <p class="hint" style="margin-top:0;">Просечна статистика екипе (на 60 минута игре, односно у процентима) у терминима у којима је овај играч играо за ту екипу - у поређењу са просеком свих екипа у свим терминима сезоне.</p>
+          <div id="impact-own"></div>
         </div>
-        <div style="height:380px;"><canvas id="compareChart"></canvas></div>
+        <div class="panel">
+          <h2 class="section-title" style="margin-top:0;">🔴 Утицај на противничку екипу</h2>
+          <p class="hint" style="margin-top:0;">Просечна статистика противничке екипе у терминима против овог играча - у поређењу са просеком свих екипа у свим терминима сезоне.</p>
+          <div id="impact-opp"></div>
+        </div>
       </div>
     </section>
 
@@ -403,6 +417,18 @@ table.heatmap tfoot th.colfoot{writing-mode:vertical-rl;transform:rotate(180deg)
         </div>
         <div style="height:540px;"><canvas id="quadChart"></canvas></div>
         <p class="hint" id="quad-legend-hint" style="margin:0.6rem 0 0 0;"></p>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title" style="margin-top:0;">Поређење играча</h2>
+        <div class="controls-row">
+          <div class="ctrl" style="flex:1;min-width:220px;">
+            <label class="ctrl-label">Изабери 2-5 играча (ctrl/cmd + клик)</label>
+            <select id="compare-players" multiple size="6" style="width:100%;"></select>
+          </div>
+          <button class="pill-btn active" id="compare-btn" style="height:2.2rem;">Упореди</button>
+        </div>
+        <div style="height:380px;"><canvas id="compareChart"></canvas></div>
       </div>
     </section>
 
@@ -643,6 +669,79 @@ function buildPlayerStats(rows){
   players.sort((a,b)=> (b["Goal Contributions per 60"]||b["Goal Contributions"]||0) - (a["Goal Contributions per 60"]||a["Goal Contributions"]||0));
   return players;
 }
+
+// ---------------- team-level per-termin aggregates (за "Утицај на екипу") ----------------
+// групише термин-редове по (Датум, Екипа) и сабира сирове бројеве целе екипе за тај термин.
+// ВАЖНО: "на 60 минута" овде мора да буде на 60 минута ТРАЈАЊА ТЕРМИНА, а не на збир минута
+// свих играча (иначе бисмо делили нпр. голове са 6×60=360 минута уместо са стварним трајањем
+// термина, па би стопа испала апсурдно мала). Зато као "минуте" тог термина узимамо
+// максималан број одиграних минута било ког играча тог дана (исто као на почетној страни).
+function buildTeamGameStats(rows){
+  const durByDate = {};
+  rows.forEach(r=>{
+    const d = r.Date, m = Number(r["Minutes Played"])||0;
+    if(!durByDate[d] || m>durByDate[d]) durByDate[d] = m;
+  });
+  const groups = {};
+  rows.forEach(r=>{
+    const key = r.Date + '|' + r.Team;
+    if(!groups[key]) groups[key] = {Date:r.Date, Team:r.Team, MinutesPlayed: durByDate[r.Date]||0};
+    const g = groups[key];
+    Object.keys(r).forEach(k=>{
+      if(["No.","Date","Team","Player Name","Minutes Played"].includes(k)) return;
+      const v = Number(r[k]);
+      if(Number.isNaN(v)) return;
+      g[k] = (g[k]||0) + v;
+    });
+  });
+  return Object.values(groups);
+}
+
+// сабира сирове бројеве преко скупа тим-термина и рачуна стопе на 60 минута и проценте
+// (тежински просек преко минута/термина, а не просечење већ израчунатих стопа по термину)
+function aggregateTeamRates(list){
+  const tot = {MinutesPlayed:0};
+  list.forEach(g=>{
+    tot.MinutesPlayed += g.MinutesPlayed||0;
+    Object.keys(g).forEach(k=>{
+      if(k==='Date'||k==='Team'||k==='MinutesPlayed') return;
+      const v = Number(g[k]);
+      if(Number.isNaN(v)) return;
+      tot[k] = (tot[k]||0) + v;
+    });
+  });
+  const out = {_games: list.length, _minutes: tot.MinutesPlayed};
+  const totalPasses = (tot["Successful passes"]||0)+(tot["Unsuccessful passes"]||0);
+  out["Pass Accuracy"] = totalPasses>0 ? round2(tot["Successful passes"]/totalPasses*100) : null;
+  const totalDribbles = (tot["Successful dribbles"]||0)+(tot["Unsuccessful dribbles"]||0);
+  out["Dribble Accuracy"] = totalDribbles>0 ? round2(tot["Successful dribbles"]/totalDribbles*100) : null;
+  const saveDenom = (tot["Saves"]||0)+(tot["Goals Conceded"]||0);
+  out["Save Percentage"] = saveDenom>0 ? round2(tot["Saves"]/saveDenom*100) : null;
+  const minutes = tot.MinutesPlayed;
+  if(minutes>0){
+    const goalContrib = (tot["Goals"]||0)+(tot["Assists"]||0);
+    out["Goal Contributions per 60"] = round2(goalContrib/minutes*60);
+    out["Total Passes per 60"] = round2(totalPasses/minutes*60);
+    out["Total Dribbles per 60"] = round2(totalDribbles/minutes*60);
+    CORE_STATS.forEach(col=>{
+      if(PER60_EXCLUDE.has(col)) return;
+      out[col+" per 60"] = round2((tot[col]||0)/minutes*60);
+    });
+  }
+  return out;
+}
+
+// за играча: сакупља сет тим-термина у којима је он играо (сопствена екипа) и
+// сет тим-термина супротне екипе на исте те датуме (противничка екипа)
+function computePlayerTeamImpact(player){
+  const playerRows = TERMINI.filter(r=>r["Player Name"]===player);
+  const ownKeySet = new Set(playerRows.map(r=>r.Date+'|'+r.Team));
+  const datesPlayed = new Set(playerRows.map(r=>r.Date));
+  const ownGames = TEAM_GAMES.filter(g=> ownKeySet.has(g.Date+'|'+g.Team));
+  const oppGames = TEAM_GAMES.filter(g=> datesPlayed.has(g.Date) && !ownKeySet.has(g.Date+'|'+g.Team));
+  return { own: aggregateTeamRates(ownGames), opp: aggregateTeamRates(oppGames) };
+}
+
 function round2(v){ return (v==null || Number.isNaN(v)) ? null : Math.round(v*10)/10; }
 
 function applyPlayerFilters(players, minGames, minMinutes){
@@ -783,6 +882,7 @@ function singleGameRecords(rows){
 // ================= App state & init =================
 let TERMINI = [], GOLOVI = [], PLAYER_STATS = [];
 let ALL_GAMES = [];
+let TEAM_GAMES = [], TEAM_BASELINE = {};
 const charts = {}; // keep refs to destroy on re-render
 
 function initApp(termini, golovi){
@@ -790,6 +890,8 @@ function initApp(termini, golovi){
   GOLOVI = golovi.map(r=>({...r, "Goalscorer": transliterate(r["Goalscorer"]), "Goalkeeper": transliterate(r["Goalkeeper"]), "Assist": transliterate(r["Assist"])}));
   PLAYER_STATS = buildPlayerStats(TERMINI);
   ALL_GAMES = Array.from(new Set(TERMINI.map(r=>r.Date))).sort();
+  TEAM_GAMES = buildTeamGameStats(TERMINI);
+  TEAM_BASELINE = aggregateTeamRates(TEAM_GAMES);
 
   // подразумевани праг за све "мин. термина" скролере: >= 1/4 одиграних термина (заокружено нагоре)
   const defaultMinGames = Math.max(1, Math.ceil(ALL_GAMES.length/4));
@@ -815,30 +917,39 @@ function initApp(termini, golovi){
 
 function setupNav(){
   document.querySelectorAll('.nav-item').forEach(item=>{
-    item.addEventListener('click', ()=>{
-      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-      item.classList.add('active');
-      document.getElementById(item.dataset.page).classList.add('active');
-      document.getElementById('sidebar').classList.remove('open');
-    });
+    item.addEventListener('click', ()=> goToPage(item.dataset.page));
   });
   const toggle = document.getElementById('mobileToggle');
   if(toggle) toggle.addEventListener('click', ()=> document.getElementById('sidebar').classList.toggle('open'));
+
+  // почетно стање историје - да "назад" из прве посећене странице не изађе одмах са сајта
+  history.replaceState({page:'page-home'}, '', location.pathname + location.search);
+
+  // "назад"/"напред" дугме у прегледачу - враћа тачно ту страницу (и играча/термин, ако је био изабран)
+  window.addEventListener('popstate', (e)=>{
+    const state = e.state || {page:'page-home'};
+    applyPageState(state.page);
+    if(state.page==='page-players' && state.player) selectPlayerState(state.player);
+    if(state.page==='page-history' && state.game) selectGameState(state.game);
+  });
 }
 
-// прелазак на страницу по data-page id (исто као клик на ставку у менију)
-function goToPage(pageId){
+// само мења видљиву страницу, без уписа у историју прегледача
+function applyPageState(pageId){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===pageId));
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active', p.id===pageId));
   document.getElementById('sidebar').classList.remove('open');
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
-// отвара страницу "Играчи" са изабраним играчем
-function goToPlayer(name){
-  if(!name) return;
-  goToPage('page-players');
+// прелазак на страницу по data-page id (исто као клик на ставку у менију) - бележи у историју прегледача
+function goToPage(pageId, extraState){
+  applyPageState(pageId);
+  history.pushState(Object.assign({page:pageId}, extraState), '', '#'+pageId);
+}
+
+// поставља изабраног играча у падајућу листу без додатног уписа у историју (користи се и за "назад")
+function selectPlayerState(name){
   const select = document.getElementById('player-select');
   const mgSlider = document.getElementById('player-mingames');
   if(mgSlider){
@@ -865,15 +976,27 @@ function goToPlayer(name){
   }
 }
 
-// отвара страницу "Термини" са изабраним термином (по датуму)
-function goToGame(date){
-  if(!date) return;
-  goToPage('page-history');
+// поставља изабрани термин у падајућу листу без додатног уписа у историју (користи се и за "назад")
+function selectGameState(date){
   const sel = document.getElementById('game-select');
   if(sel){
     sel.value = date;
     sel.dispatchEvent(new Event('change'));
   }
+}
+
+// отвара страницу "Играчи" са изабраним играчем
+function goToPlayer(name){
+  if(!name) return;
+  goToPage('page-players', {player:name});
+  selectPlayerState(name);
+}
+
+// отвара страницу "Термини" са изабраним термином (по датуму)
+function goToGame(date){
+  if(!date) return;
+  goToPage('page-history', {game:date});
+  selectGameState(date);
 }
 
 // делегирано хватање кликова на линкове ка играчима/терминима, ради без обзира на поновно исцртавање DOM-а
@@ -883,6 +1006,7 @@ document.addEventListener('click', (e)=>{
   const gameLink = e.target.closest('.js-game-link');
   if(gameLink){ e.preventDefault(); goToGame(gameLink.dataset.game); return; }
 });
+
 
 function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
 
@@ -958,14 +1082,17 @@ function renderHome(){
   const el = document.getElementById('home-metrics');
   const totalGoals = PLAYER_STATS.reduce((s,p)=>s+(p.Goals||0),0);
   const totalAssists = PLAYER_STATS.reduce((s,p)=>s+(p.Assists||0),0);
-  const totalMinutes = PLAYER_STATS.reduce((s,p)=>s+(p['Minutes Played']||0),0);
+  const totalMinutes = ALL_GAMES.reduce((s,date)=>{
+    const maxInGame = TERMINI.filter(r=>r.Date===date).reduce((m,r)=>Math.max(m, Number(r['Minutes Played'])||0), 0);
+    return s + maxInGame;
+  }, 0);
   const minGamesPct = ALL_GAMES.length ? Math.round((minGames/ALL_GAMES.length)*100) : 0;
   const cards = [
     [ICONS.players,'Играчи', eligible.length, `играча је одиграло бар ${minGamesPct}% термина`, '#37003c'],
     [ICONS.games,'Термини', ALL_GAMES.length, 'одиграна термина', '#37003c'],
-    [ICONS.goals,'Погоци', totalGoals, 'број постигнутих погодака', '#37003c'],
-    [ICONS.assists,'Асистенције', totalAssists, 'забележене асистенције', '#0091c2'],
-    [ICONS.minutes,'Минути', totalMinutes.toLocaleString('sr-RS'), 'укупно минута', '#e90052'],
+    [ICONS.minutes,'Минути', totalMinutes.toLocaleString('sr-RS'), 'одиграних минута', '#e90052'],
+    [ICONS.goals,'Погоци', totalGoals, 'постигнутих погодака у сезони', '#37003c'],
+    [ICONS.assists,'Асистенције', totalAssists, 'забележених асистенција у сезони', '#0091c2'],
   ];
   el.innerHTML = cards.map(([icon,label,val,sub,color])=>`
     <div class="metric-card">
@@ -1046,20 +1173,24 @@ function renderPlayersPage(){
   select.addEventListener('change', renderPlayerProfile);
   mgSlider.addEventListener('input', ()=>{ refreshPlayerOptions(true); renderPlayerProfile(); });
 
-  // comparison tool
+  renderPlayerProfile();
+}
+
+// алат за поређење играча - живи на страници "Трендови", али подразумевано користи играча
+// изабраног на врху странице "Играчи" (select #player-select) као полазну тачку поређења
+function setupPlayerComparison(){
+  const select = document.getElementById('player-select');
   const playersAZ = srSortBy(PLAYER_STATS, p=>p['Player Name']);
   const cmpSelect = document.getElementById('compare-players');
   cmpSelect.innerHTML = playersAZ.map(p=>`<option value="${p['Player Name']}">${p['Player Name']}</option>`).join('');
   document.getElementById('compare-btn').addEventListener('click', renderComparison);
 
-  // подразумевано поређење: играч изабран на врху странице + следећи играч са листе (корисник може сам да промени)
+  // подразумевано поређење: играч изабран на врху странице "Играчи" + следећи играч са листе (корисник може сам да промени)
   const currentPlayer = select.value;
   const currentIdx = playersAZ.findIndex(p=>p['Player Name']===currentPlayer);
   const otherPlayer = playersAZ.length>1 ? playersAZ[(currentIdx+1) % playersAZ.length]['Player Name'] : null;
   Array.from(cmpSelect.options).forEach(o=>{ o.selected = (o.value===currentPlayer || o.value===otherPlayer); });
   renderComparison();
-
-  renderPlayerProfile();
 }
 
 function renderPlayerProfile(){
@@ -1161,7 +1292,83 @@ function renderPlayerProfile(){
     {key:'Interceptions', label:'Пресеч.'}, {key:'Minutes Played', label:'Минути'},
   ];
   buildSortableTable(document.getElementById('player-games-table'), cols, gameRows, {defaultSort:'Date', defaultDir:1});
+
+  // утицај на своју / противничку екипу
+  renderTeamImpact(player);
 }
+
+// листа релевантних статистика (на 60 минута + процентуалне) које се приказују за утицај на екипу
+const IMPACT_STATS = [
+  'Goal Contributions per 60','Goals per 60','Assists per 60','Big Chances Created per 60',
+  'Shots on Goal per 60','Total Shots per 60','Successful dribbles per 60','Total Dribbles per 60','Dribble Accuracy',
+  'Successful passes per 60','Total Passes per 60','Pass Accuracy',
+  'Tackles Won per 60','Interceptions per 60','Blocks per 60',
+  'Saves per 60','Save Percentage','Goals Conceded per 60','Corners Taken per 60','Hit Woodwork per 60','Own Goals per 60'
+];
+const IMPACT_PERCENT_STATS = new Set(['Pass Accuracy','Dribble Accuracy','Save Percentage']);
+// статистике код којих је МАЊА вредност боља за екипу којој та бројка припада
+// (нпр. мање примљених голова је добро за ту екипу) - све остало важи "више је боље"
+const IMPACT_LOWER_IS_BETTER = new Set(['Goals Conceded per 60','Own Goals per 60']);
+
+function fmtImpactValue(stat, v){
+  if(v==null) return '-';
+  return IMPACT_PERCENT_STATS.has(stat) ? fmtNum(v,1)+'%' : fmtNum(v,1);
+}
+
+// разлика у односу на просек сезоне: процентне статистике у процентним поенима, остале релативно (%)
+// боја (зелено/црвено) не прати сирови предзнак промене, него да ли је тај исход добар за НАШ клуб:
+// - у "Утицај на своју екипу" (invert=false): боље за нашу екипу = зелено (нпр. више голова, мање примљених голова)
+// - у "Утицај на противничку екипу" (invert=true): боји се обрнуто, јер је нама добро кад противнику иде лошије
+//   (нпр. пад голова противника или пад његове прецизности паса = зелено, иако је број у минусу)
+function impactDelta(stat, value, baseline, invert){
+  if(value==null || baseline==null) return {text:'—', cls:'flat'};
+  const lowerIsBetter = IMPACT_LOWER_IS_BETTER.has(stat);
+  const colorFromDir = (dir)=>{
+    let goodness = lowerIsBetter ? -dir : dir;
+    if(invert) goodness = -goodness;
+    return goodness>0 ? 'up' : goodness<0 ? 'down' : 'flat';
+  };
+  if(IMPACT_PERCENT_STATS.has(stat)){
+    const diff = value - baseline;
+    const dir = diff>0.05 ? 1 : diff<-0.05 ? -1 : 0;
+    const sign = diff>0 ? '+' : '';
+    return {text:`${sign}${diff.toFixed(1)} п.п.`, cls: colorFromDir(dir)};
+  }
+  if(!baseline){ return {text:'—', cls:'flat'}; }
+  const diffPct = (value-baseline)/baseline*100;
+  const dir = diffPct>2 ? 1 : diffPct<-2 ? -1 : 0;
+  const sign = diffPct>0 ? '+' : '';
+  return {text:`${sign}${diffPct.toFixed(0)}%`, cls: colorFromDir(dir)};
+}
+
+function renderImpactList(containerId, rates, invert){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  if(!rates || !rates._games){
+    el.innerHTML = '<p class="hint" style="margin:0;">Нема довољно података за овог играча.</p>';
+    return;
+  }
+  el.innerHTML = IMPACT_STATS.filter(stat=>rates[stat]!=null).map(stat=>{
+    const baseline = TEAM_BASELINE[stat];
+    const delta = impactDelta(stat, rates[stat], baseline, invert);
+    return `<div class="impact-row">
+      <div class="impact-label">${displayLabel(stat)}</div>
+      <div class="impact-values">
+        <span class="impact-value">${fmtImpactValue(stat, rates[stat])}</span>
+        <span class="impact-avg">просек ${fmtImpactValue(stat, baseline)}</span>
+        <span class="impact-delta ${delta.cls}">${delta.text}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderTeamImpact(player){
+  const impact = computePlayerTeamImpact(player);
+  renderImpactList('impact-own', impact.own, false);
+  renderImpactList('impact-opp', impact.opp, true);
+}
+
+
 function player_stat_rank_js(filtered, player, column){
   const vals = filtered.map(p=>Number(p[column])||0);
   const target = filtered.find(p=>p['Player Name']===player);
@@ -1307,6 +1514,7 @@ function renderTrendsPage(){
   renderTeamFormChart();
   renderGoalsByMonth();
   setupQuadrant();
+  setupPlayerComparison();
 }
 
 function renderTeamFormChart(){
