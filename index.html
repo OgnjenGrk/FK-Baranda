@@ -290,7 +290,7 @@ table.heatmap.heatmap-wide td, table.heatmap.heatmap-wide thead th, table.heatma
     <!-- ПОЧЕТНА -->
     <section class="page active" id="page-home">
       <h1 class="page-title">🏆 ФК Баранда - статистика сезоне 2025/26.</h1>
-      <p class="hint" style="margin-top:-0.5rem;margin-bottom:0.8rem;">Од 18. 8. 2025. до 25. 5. 2026.</p>
+      <p class="hint" style="margin-top:-0.5rem;margin-bottom:0.8rem;">Од 1. 8. 2025. до 31. 5. 2026.</p>
       <div class="metric-row" id="home-metrics"></div>
       <h2 class="section-title">Истакнути појединци</h2>
       <div class="grid-3" id="home-spotlight" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;"></div>
@@ -530,7 +530,8 @@ const PLAYER_NAME_OVERRIDES = {
 "Strahinja Milovanovic":"Страхиња Миловановић","Vanijev Burazer":"Ванијев Буразер","Viktor Joldzic":"Виктор Јолџић",
 "~Viktor 2 (Bubanjin)":"~Виктор 2 (Бубањин)","Right Foot":"Десна нога","Left Foot":"Лева нога","Header":"Глава","Body":"Тело",
 "Bubanja (golman)":"Бубања (голман)","Nenad Tegijev":"Ненад Тегијев","Nenad Vidakovic":"Ненад Видаковић",
-"Dusan Stojicic":"Душан Стојичић","Viktor Vukotic":"Виктор Вукотић","Nenad Rodic":"Ненад Родић"
+"Dusan Stojicic":"Душан Стојичић","Viktor Vukotic":"Виктор Вукотић","Nenad Rodic":"Ненад Родић",
+"Srdjan Tegijev":"Срђан Тегијев","Zeljko Tegijev":"Жељко Тегијев"
 };
 const LATIN_DIGRAPHS = {"dž":"џ","lj":"љ","nj":"њ"};
 const LATIN_TO_CYR = {a:"а",b:"б",c:"ц",č:"ч",ć:"ћ",d:"д",đ:"ђ",e:"е",f:"ф",g:"г",h:"х",i:"и",j:"ј",k:"к",l:"л",m:"м",n:"н",o:"о",p:"п",r:"р",s:"с",š:"ш",t:"т",u:"у",v:"в",z:"з",ž:"ж"};
@@ -759,7 +760,7 @@ function computePlayerTeamImpact(player){
   return { own: aggregateTeamRates(ownGames), opp: aggregateTeamRates(oppGames) };
 }
 
-function round2(v){ return (v==null || Number.isNaN(v)) ? null : Math.round(v*10)/10; }
+function round2(v){ return (v==null || Number.isNaN(v)) ? null : Math.round(v*100)/100; }
 
 function applyPlayerFilters(players, minGames, minMinutes){
   return players.filter(p => p["Games Played"]>=minGames && (p["Minutes Played"]||0)>=minMinutes);
@@ -903,8 +904,11 @@ let TEAM_GAMES = [], TEAM_BASELINE = {};
 const charts = {}; // keep refs to destroy on re-render
 
 function initApp(termini, golovi){
-  TERMINI = termini.map(r=>({...r, "Player Name": transliterate(r["Player Name"])}));
-  GOLOVI = golovi.map(r=>({...r, "Goalscorer": transliterate(r["Goalscorer"]), "Goalkeeper": transliterate(r["Goalkeeper"]), "Assist": transliterate(r["Assist"])}));
+  const GHOST_PLAYER = "Бубања (голман)"; // дупликат/погрешан унос - треба да остану само "Огњен Бубања" и "Огњен Бубања (голман)"
+  TERMINI = termini.map(r=>({...r, "Player Name": transliterate(r["Player Name"])}))
+    .filter(r=> r["Player Name"] !== GHOST_PLAYER);
+  GOLOVI = golovi.map(r=>({...r, "Goalscorer": transliterate(r["Goalscorer"]), "Goalkeeper": transliterate(r["Goalkeeper"]), "Assist": transliterate(r["Assist"])}))
+    .filter(r=> r["Goalscorer"]!==GHOST_PLAYER && r["Goalkeeper"]!==GHOST_PLAYER && r["Assist"]!==GHOST_PLAYER);
   PLAYER_STATS = buildPlayerStats(TERMINI);
   ALL_GAMES = Array.from(new Set(TERMINI.map(r=>r.Date))).sort();
   TEAM_GAMES = buildTeamGameStats(TERMINI);
@@ -1145,7 +1149,7 @@ function renderHome(){
     {key:'Wins', label:'Победе'},
     {key:'Losses', label:'Порази'},
     {key:'Draws', label:'Нерешено'},
-    {key:'Points per Game', label:'Бодови', format:v=>v==null?'-':fmtNum(v,1)},
+    {key:'Points per Game', label:'Бодови', format:v=>v==null?'-':fmtNum(v,2)},
     {key:'Goals', label:'Погоци'},
     {key:'Assists', label:'Асистенције'},
     {key:'Goal Contributions', label:'Г+А'},
