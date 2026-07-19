@@ -313,8 +313,8 @@ table.heatmap.heatmap-wide td, table.heatmap.heatmap-wide thead th, table.heatma
           <svg viewBox="0 0 24 24" fill="#FF0000" xmlns="http://www.w3.org/2000/svg"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.8ZM9.6 15.6V8.4L15.8 12l-6.2 3.6Z"/></svg>
         </div>
         <div class="yt-promo-text">
-          <b>Погледај снимке наших термина</b>
-          <span>Сви термини се снимају и постављају на Јутјуб каналу FieldCam X — кликни да погледаш</span>
+          <b>Статистика рађена на основу снимака са канала FieldCamX</b>
+          <span>Спортски Центар 7, Бежанија</span>
         </div>
         <span class="yt-promo-btn">▶ Отвори канал</span>
       </a>
@@ -415,7 +415,7 @@ table.heatmap.heatmap-wide td, table.heatmap.heatmap-wide thead th, table.heatma
 
     <!-- НАГРАДЕ -->
     <section class="page" id="page-awards">
-      <h1 class="page-title">🥇 Топ листе сезоне</h1>
+      <h1 class="page-title">🥇 Топ листе и рекорди</h1>
       <div class="panel">
         <div class="controls-row" style="margin-bottom:0.4rem;">
           <h2 class="section-title" style="margin:0;" id="leaderboard-title">Топ 10 листа</h2>
@@ -456,6 +456,18 @@ table.heatmap.heatmap-wide td, table.heatmap.heatmap-wide thead th, table.heatma
           </div>
         </div>
         <div style="height:300px;"><canvas id="trendChart"></canvas></div>
+      </div>
+
+      <h2 class="section-title" style="font-size:1.25rem;color:var(--pink);margin-top:2rem;">⚽ Постигнути погоци</h2>
+      <div class="grid-2">
+        <div class="panel">
+          <h2 class="section-title" style="margin-top:0;">Погоци према делу тела</h2>
+          <div id="goal-bodypart-table"></div>
+        </div>
+        <div class="panel">
+          <h2 class="section-title" style="margin-top:0;">Расподела по интервалима</h2>
+          <div style="height:280px;"><canvas id="goalIntervalChart"></canvas></div>
+        </div>
       </div>
 
       <h2 class="section-title" style="font-size:1.25rem;color:var(--pink);margin-top:2rem;">3D квадрантни график</h2>
@@ -1597,7 +1609,68 @@ function renderHeatmapTable(containerId, pairStats, minGames, symmetric){
   container.innerHTML = html;
 }
 
-// ================= ТРЕНДОВИ =================
+// ================= ПОСТИГНУТИ ПОГОЦИ (део тела / минути / интервали) =================
+function renderGoalBreakdown(){
+  const bodyParts = [
+    {key:'Left F. Goals', label:'Левом ногом'},
+    {key:'Right F. Goals', label:'Десном ногом'},
+    {key:'Header Goals', label:'Главом'},
+    {key:'Body Goals', label:'Остатком тела'}
+  ];
+  const sums = {};
+  let total = 0;
+  bodyParts.forEach(bp=>{
+    const s = PLAYER_STATS.reduce((acc,p)=>acc+(p[bp.key]||0),0);
+    sums[bp.key] = s;
+    total += s;
+  });
+  const tableEl = document.getElementById('goal-bodypart-table');
+  if(tableEl){
+    let html = '<div class="table-wrap"><table class="stat-table"><thead><tr><th>Део тела</th><th>Број погодака</th><th>Удео погодака (%)</th></tr></thead><tbody>';
+    bodyParts.forEach(bp=>{
+      const pct = total>0 ? (sums[bp.key]/total*100) : 0;
+      html += `<tr><td>${bp.label}</td><td>${fmtNum(sums[bp.key],0)}</td><td>${fmtNum(pct,1)}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    tableEl.innerHTML = html;
+  }
+
+  // аутоголови се искључују - исто као код хитмапе периода постизања погодака
+  const validGoals = GOLOVI.filter(g=> g.Minute!=null && !Number.isNaN(Number(g.Minute))
+    && !/^Аутогол\s*-\s*/.test(g.Goalscorer||''));
+  if(!validGoals.length) return;
+
+  // максималан минут (потребан за одређивање броја 10-минутних интервала)
+  let maxMinute = 0;
+  validGoals.forEach(g=>{
+    const m = Math.round(Number(g.Minute));
+    if(m>maxMinute) maxMinute = m;
+  });
+
+  // доња статистика по 10-минутним интервалима
+  const bucketSize = 10;
+  const bucketCount = Math.max(1, Math.floor(maxMinute/bucketSize)+1);
+  const bucketCounts = new Array(bucketCount).fill(0);
+  validGoals.forEach(g=>{
+    const idx = Math.min(bucketCount-1, Math.floor(Number(g.Minute)/bucketSize));
+    bucketCounts[idx]++;
+  });
+  const bucketLabels = bucketCounts.map((_,i)=> i===bucketCount-1 ? `${i*bucketSize}'+` : `${i*bucketSize}-${i*bucketSize+bucketSize}`);
+  const palette = ['#37003c','#e90052','#0091c2','#00a15c','#eaa300','#d81159','#04b8d6','#a78bfa'];
+
+  destroyChart('goalIntervalChart');
+  const intCanvas = document.getElementById('goalIntervalChart');
+  if(intCanvas){
+    charts.goalIntervalChart = new Chart(intCanvas.getContext('2d'), {
+      type:'doughnut',
+      data:{ labels: bucketLabels, datasets:[{ data: bucketCounts, backgroundColor: bucketLabels.map((_,i)=>palette[i%palette.length]), borderColor:'#ffffff', borderWidth:2 }]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:'right', labels:{boxWidth:12, font:{size:11}}},
+          tooltip:{ callbacks:{ label:(c)=>{ const tot = bucketCounts.reduce((a,b)=>a+b,0); const pct = tot>0? (c.raw/tot*100).toFixed(1):0; return `${c.label}': ${c.raw} (${pct}%)`; } } } } }
+    });
+  }
+}
+
 function renderTrendsPage(){
   const trendSel = document.getElementById('trend-metric');
   const metrics = srSortBy([...CORE_STATS, 'Fouls', 'Team Pass Accuracy'], m=>displayLabel(m));
@@ -1605,6 +1678,7 @@ function renderTrendsPage(){
   trendSel.value = 'Goals';
   trendSel.addEventListener('change', renderTeamFormChart);
   renderTeamFormChart();
+  renderGoalBreakdown();
   document.getElementById('goaltime-mingames').addEventListener('input', renderGoalTimeHeatmap);
   renderGoalTimeHeatmap();
   setupQuadrant();
@@ -1843,13 +1917,16 @@ const LEADERBOARD_OPTIONS = {
   'Шутеви у оквир на 60 минута':'Shots on Goal per 60','Успешна додавања на 60 минута':'Successful passes per 60',
   'Успешни дриблинзи на 60 минута':'Successful dribbles per 60','Одузете лопте на 60 минута':'Tackles Won per 60',
   'Пресечене лопте на 60 минута':'Interceptions per 60','Одбране на 60 минута':'Saves per 60',
+  'Блокирани ударци на 60 минута':'Blocks per 60','Одбрањени ударци (%)':'Save Percentage',
   'Прецизност паса':'Pass Accuracy','Бодови по термину':'Points per Game',
   'Укупно погодака':'Goals','Укупно асистенција':'Assists',
   'Ружичаста површина (деветоугао)':'__RADAR_AREA__'
 };
 function renderAwardsPage(){
   const sel = document.getElementById('award-metric');
-  sel.innerHTML = Object.keys(LEADERBOARD_OPTIONS).map(k=>`<option value="${k}">${k}</option>`).join('');
+  const sortedLabels = srSortBy(Object.keys(LEADERBOARD_OPTIONS), k=>k);
+  sel.innerHTML = sortedLabels.map(k=>`<option value="${k}">${k}</option>`).join('');
+  sel.value = 'Погоци на 60 минута';
   sel.addEventListener('change', renderLeaderboard);
   document.getElementById('award-mingames').addEventListener('input', renderLeaderboard);
   document.getElementById('award-scope').addEventListener('change', renderLeaderboard);
@@ -1890,10 +1967,11 @@ function renderLeaderboard(){
       <div class="bar-row">
         <div class="bar-name js-player-link" data-player="${p['Player Name']}"><span class="player-link-name">${p['Player Name']}</span></div>
         <div class="bar-track"><div class="bar-fill" style="width:${(p.__area/max*100).toFixed(1)}%"></div></div>
-        <div class="bar-val">${fmtNum(p.__area,1)}%</div>
+        <div class="bar-val">${fmtNum(p.__area,0)}%</div>
       </div>`).join('') : '<p class="hint">Нема играча за изабрани праг термина.</p>';
     return;
   }
+  const decimals = col.endsWith(' per 60') ? 1 : 0;
   let top = PLAYER_STATS.filter(p=>p[col]!=null && (p['Games Played']||0)>=minGames).sort((a,b)=>b[col]-a[col]);
   if(!showAll) top = top.slice(0,10);
   if(titleEl) titleEl.textContent = showAll ? `Сви играчи (${top.length})` : 'Топ 10 листа';
@@ -1902,7 +1980,7 @@ function renderLeaderboard(){
     <div class="bar-row">
       <div class="bar-name js-player-link" data-player="${p['Player Name']}"><span class="player-link-name">${p['Player Name']}</span></div>
       <div class="bar-track"><div class="bar-fill" style="width:${(p[col]/max*100).toFixed(1)}%"></div></div>
-      <div class="bar-val">${fmtNum(p[col],1)}</div>
+      <div class="bar-val">${fmtNum(p[col],decimals)}</div>
     </div>`).join('') : '<p class="hint">Нема играча за изабрани праг термина.</p>';
 }
 
