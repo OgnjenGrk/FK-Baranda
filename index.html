@@ -109,7 +109,7 @@ table.stat-table tbody tr.rank-1 td:first-child{color:var(--pink);font-weight:80
 .player-cell{display:flex;align-items:center;justify-content:center;gap:0.5rem;}
 
 /* колона "Играч" само у табели на почетној страни: лево поравнање због дужине имена */
-#home-table th:nth-child(2), #home-table td:nth-child(2){text-align:left;}
+#home-table th:nth-child(1), #home-table td:nth-child(1){text-align:left;}
 #home-table .player-cell{justify-content:flex-start;}
 #game-stats-table th:nth-child(2), #game-stats-table td:nth-child(2){text-align:left;}
 #game-stats-table .player-cell{justify-content:flex-start;}
@@ -1011,6 +1011,34 @@ function initApp(termini, golovi){
   renderAwardsPage();
   renderMVPPage();
   renderHistoryPage();
+
+  // ако је линк отворен са конкретним играчем/термином у адреси, изабери га сад
+  // (тек пошто су падајуће листе изнад попуњене одговарајућим опцијама)
+  const deepLink = window.__initialDeepLink;
+  if(deepLink){
+    if(deepLink.page==='page-players' && deepLink.player) selectPlayerState(deepLink.player);
+    if(deepLink.page==='page-history' && deepLink.game) selectGameState(deepLink.game);
+  }
+}
+
+// правимо URL hash облика "#page-players/p/Име+Играча" или "#page-history/g/2026-03-15"
+// - тако линк који неко подели поред странице носи и који је играч/термин био изабран
+function hashFor(pageId, extraState){
+  if(extraState && extraState.player) return '#'+pageId+'/p/'+encodeURIComponent(extraState.player);
+  if(extraState && extraState.game) return '#'+pageId+'/g/'+encodeURIComponent(extraState.game);
+  return '#'+pageId;
+}
+
+// чита тренутни hash из адресе (нпр. при отварању линка) и враћа {page, player?, game?}
+function parseHashState(){
+  const raw = (location.hash || '').replace('#', '');
+  if(!raw) return {page:'page-home'};
+  const parts = raw.split('/');
+  const page = parts[0];
+  if(!document.getElementById(page)) return {page:'page-home'};
+  if(parts[1]==='p' && parts[2]) return {page, player: decodeURIComponent(parts[2])};
+  if(parts[1]==='g' && parts[2]) return {page, game: decodeURIComponent(parts[2])};
+  return {page};
 }
 
 function setupNav(){
@@ -1020,8 +1048,11 @@ function setupNav(){
   const toggle = document.getElementById('mobileToggle');
   if(toggle) toggle.addEventListener('click', ()=> document.getElementById('sidebar').classList.toggle('open'));
 
-  // почетно стање историје - да "назад" из прве посећене странице не изађе одмах са сајта
-  history.replaceState({page:'page-home'}, '', location.pathname + location.search);
+  // почетно стање историје - ако је линк отворен са #page-.../p/Играч или #page-.../g/Термин, отвори баш то
+  const initState = parseHashState();
+  if(initState.page !== 'page-home') applyPageState(initState.page);
+  history.replaceState(initState, '', location.pathname + location.search + hashFor(initState.page, initState));
+  window.__initialDeepLink = initState;
 
   // "назад"/"напред" дугме у прегледачу - враћа тачно ту страницу (и играча/термин, ако је био изабран)
   window.addEventListener('popstate', (e)=>{
@@ -1043,7 +1074,7 @@ function applyPageState(pageId){
 // прелазак на страницу по data-page id (исто као клик на ставку у менију) - бележи у историју прегледача
 function goToPage(pageId, extraState){
   applyPageState(pageId);
-  history.pushState(Object.assign({page:pageId}, extraState), '', '#'+pageId);
+  history.pushState(Object.assign({page:pageId}, extraState), '', hashFor(pageId, extraState));
 }
 
 // пребацује на страницу "Топ листе", поставља изабрану статистику и обим (топ10 ако је ранг 1-10, иначе сви играчи)
@@ -1182,7 +1213,8 @@ function wireMinGamesNumber(sliderId){
 
 function buildSortableTable(container, columns, rows, opts={}){
   // columns: [{key, label, format?}]
-  let sortKey = opts.defaultSort || columns[1].key;
+  let sortKey = opts.defaultSort || columns[0].key;
+  const playerCol = columns.find(c=>c.isPlayer);
   let sortDir = opts.defaultDir !== undefined ? opts.defaultDir : -1;
   function render(){
     const sorted = [...rows].sort((a,b)=>{
@@ -1199,7 +1231,7 @@ function buildSortableTable(container, columns, rows, opts={}){
       html += `<tr class="${i===0?'rank-1':''}">`;
       columns.forEach(c=>{
         let v = r[c.key];
-        if(c.key === columns[1].key && columns[1].isPlayer){
+        if(playerCol && c.key === playerCol.key){
           html += `<td><div class="player-cell js-player-link" data-player="${v}"><div class="player-avatar">${initials(v)}</div><span class="player-link-name">${v}</span></div></td>`;
         } else {
           html += `<td>${c.format ? c.format(v,r) : (v==null? '-' : v)}</td>`;
@@ -1273,7 +1305,6 @@ function renderHome(){
 
   // табела играча (само они који испуњавају праг)
   const columns = [
-    {key:'rank', label:'#', format:(v,r,i)=>''},
     {key:'Player Name', label:'Играч', isPlayer:true},
     {key:'Games Played', label:'Термини'},
     {key:'Wins', label:'Победе'},
@@ -1289,9 +1320,7 @@ function renderHome(){
     {key:'Goals Conceded', label:'Примљени<br>погоци'},
     {key:'Minutes Played', label:'Минути'},
   ];
-  // add rank index
-  const rows = [...eligible].sort((a,b)=>(b['Goal Contributions']||0)-(a['Goal Contributions']||0))
-    .map((p,i)=>({...p, rank:i+1}));
+  const rows = [...eligible].sort((a,b)=>(b['Goal Contributions']||0)-(a['Goal Contributions']||0));
   buildSortableTable(document.getElementById('home-table'), columns, rows, {
     defaultSort: homeTableSort.key,
     defaultDir: homeTableSort.dir,
